@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bot,
   AlertTriangle,
@@ -25,6 +26,7 @@ import {
   FileText,
   ScrollText,
   Brain,
+  X,
 } from 'lucide-react';
 import {
   AGENTS,
@@ -54,6 +56,7 @@ export default function PKSFAgentDemo() {
   const [agentRuns, setAgentRuns] = useState([]);
   const [stepCursor, setStepCursor] = useState(0);
   const [pausedVisual, setPausedVisual] = useState(false);
+  const [finishedAgents, setFinishedAgents] = useState([]);
 
   const escalationResolver = useRef(null);
   const memoGateResolver = useRef(null);
@@ -100,6 +103,7 @@ export default function PKSFAgentDemo() {
     setMemoGate(false);
     setShowArtifact(false);
     setAgentRuns([]);
+    setFinishedAgents([]);
     currentAgentIdRef.current = null;
     setPresenterNoteStep(-1);
     stepIdxRef.current = 0;
@@ -236,6 +240,70 @@ export default function PKSFAgentDemo() {
     }
     setRunning(false);
   }, [activeScenario]);
+
+  // Label for the "run next agent" button — shows the first agent not yet activated.
+  // Updates only after the previous agent's block finishes and its card goes Done.
+  const nextAgentLabel = useMemo(() => {
+    const script = activeScenario.script;
+    for (let i = 0; i < script.length; i++) {
+      if (script[i].type === 'agent' && !activeAgents.includes(script[i].id)) {
+        const agent = AGENTS.find((a) => a.id === script[i].id);
+        return agent ? agent.name : script[i].id;
+      }
+    }
+    return null;
+  }, [activeAgents, activeScenario]);
+
+  const runNextAgent = useCallback(async () => {
+    const script = activeScenario.script;
+    const startIdx = stepIdxRef.current;
+    if (startIdx >= script.length || running) return;
+
+    abortRef.current = false;
+    setRunning(true);
+
+    // Find the first 'agent' step at or after startIdx — the agent whose block we're running
+    let firstAgentIdx = -1;
+    let runningAgentId = null;
+    for (let i = startIdx; i < script.length; i++) {
+      if (script[i].type === 'agent') {
+        firstAgentIdx = i;
+        runningAgentId = script[i].id;
+        break;
+      }
+    }
+
+    // Run until (but not including) the NEXT 'agent' step after firstAgentIdx
+    let endIdx = script.length;
+    if (firstAgentIdx !== -1) {
+      for (let i = firstAgentIdx + 1; i < script.length; i++) {
+        if (script[i].type === 'agent') {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+
+    for (let i = startIdx; i < endIdx; i++) {
+      if (abortRef.current) break;
+      await sleep(Math.min(script[i].delay ?? 0, 350));
+      if (abortRef.current) break;
+      await applyStep(script[i], i);
+      stepIdxRef.current = i + 1;
+      setStepCursor(stepIdxRef.current);
+    }
+
+    // Mark this agent's block as fully done so its card transitions to "Done"
+    // before the next agent is activated. This is what triggers the button label update.
+    if (!abortRef.current && runningAgentId) {
+      setFinishedAgents((prev) => (prev.includes(runningAgentId) ? prev : [...prev, runningAgentId]));
+    }
+
+    if (!abortRef.current && stepIdxRef.current >= script.length) {
+      setCompleted(true);
+    }
+    setRunning(false);
+  }, [activeScenario, running]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -539,11 +607,14 @@ export default function PKSFAgentDemo() {
                   {running && !stepMode ? (
                     <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
                   ) : stepMode ? (
-                    <SkipForward size={15} />
+                    stepCursor === 0 ? <Play size={15} fill={COLORS.onAccent} /> : <SkipForward size={15} />
                   ) : (
                     <Play size={15} fill={COLORS.onAccent} />
                   )}
-                  {stepMode ? t('nextStep') : running ? t('running') : completed ? t('runAgain') : t('runDemo')}
+                  {stepMode
+                    ? (stepCursor === 0 ? 'Start Freya' : t('nextStep'))
+                    : running ? t('running') : completed ? t('runAgain') : t('runDemo')
+                  }
                 </button>
                 <button
                   type="button"
@@ -640,6 +711,10 @@ export default function PKSFAgentDemo() {
               isComplete={showArtifact}
               stepMode={stepMode}
               onNextStep={runStepForward}
+              onNextAgent={runNextAgent}
+              nextAgentLabel={nextAgentLabel}
+              isRunning={running}
+              finishedAgents={finishedAgents}
               t={t}
             />
           </div>
@@ -1075,7 +1150,7 @@ function AgentRunCard({ run, isDone, t }) {
 
 }
 
-function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, t }) {
+function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, finishedAgents = [], t }) {
   const currentAgentId = activeAgents[activeAgents.length - 1];
   const scrollRef = useRef(null);
   const bottomRef = useRef(null);
@@ -1133,7 +1208,7 @@ function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, t }) {
           <AgentRunCard
             key={run.id}
             run={run}
-            isDone={isComplete || run.agentId !== currentAgentId}
+            isDone={isComplete || finishedAgents.includes(run.agentId) || run.agentId !== currentAgentId}
             t={t}
           />
         ))}
@@ -1471,9 +1546,15 @@ function AgentPanel({
   isComplete,
   stepMode,
   onNextStep,
+  onNextAgent,
+  nextAgentLabel,
+  isRunning,
+  finishedAgents,
   t,
 }) {
   const [openSource, setOpenSource] = useState(null);
+  const [showFinalReport, setShowFinalReport] = useState(false);
+  const humanGateRef = useRef(null);
 
   useEffect(() => {
     if (reasoning.length === 0) setOpenSource(null);
@@ -1486,6 +1567,15 @@ function AgentPanel({
     });
     return () => cancelAnimationFrame(id);
   }, [openSource]);
+
+  useEffect(() => {
+    if ((escalation || memoGate) && humanGateRef.current) {
+      const id = requestAnimationFrame(() => {
+        humanGateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      return () => cancelAnimationFrame(id);
+    }
+  }, [escalation, memoGate]);
 
   const viewLedgerSourceId = scenario.escalation?.viewLedgerSourceId;
 
@@ -1548,40 +1638,109 @@ function AgentPanel({
               openSource={openSource}
               setOpenSource={setOpenSource}
             />
-            {stepMode && !isComplete && (
-              <button
-                onClick={onNextStep}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  alignSelf: 'flex-start',
-                  padding: '11px 18px',
-                  background: COLORS.mint,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: '0.88em',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  letterSpacing: 0.3,
-                  boxShadow: '0 2px 8px rgba(22,148,84,0.25)',
-                  transition: 'background 0.15s, transform 0.1s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = COLORS.mintDim}
-                onMouseLeave={e => e.currentTarget.style.background = COLORS.mint}
-                onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
-                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                <ChevronRight size={16} />
-                {t('nextStep')}
-              </button>
+            {stepMode && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {/* Next Step — only while not complete */}
+                {!isComplete && (
+                  <button
+                    onClick={onNextStep}
+                    disabled={isRunning}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: '10px 16px',
+                      background: isRunning ? COLORS.surfaceHi : COLORS.surface,
+                      color: isRunning ? COLORS.textMute : COLORS.mint,
+                      border: `1.5px solid ${isRunning ? COLORS.border : COLORS.mint}`,
+                      borderRadius: 8,
+                      fontSize: '0.88em',
+                      fontWeight: 700,
+                      cursor: isRunning ? 'not-allowed' : 'pointer',
+                      opacity: isRunning ? 0.6 : 1,
+                      transition: 'background 0.15s, color 0.15s',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <ChevronRight size={14} />
+                    {t('nextStep')}
+                  </button>
+                )}
+
+                {/* Start [Agent] while agents remain; Show Final Report when all done */}
+                {!isComplete && nextAgentLabel && (
+                  <button
+                    onClick={onNextAgent}
+                    disabled={isRunning}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: '10px 18px',
+                      background: isRunning ? COLORS.surfaceHi : COLORS.teal,
+                      color: isRunning ? COLORS.textMute : '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: '0.88em',
+                      fontWeight: 700,
+                      cursor: isRunning ? 'not-allowed' : 'pointer',
+                      opacity: isRunning ? 0.6 : 1,
+                      boxShadow: isRunning ? 'none' : '0 2px 10px rgba(13,148,136,0.3)',
+                      transition: 'background 0.15s, box-shadow 0.15s',
+                      fontFamily: 'inherit',
+                      maxWidth: 260,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {isRunning ? <Loader2 size={14} className="spin" /> : <Zap size={14} />}
+                    {isRunning ? 'Running…' : `Start ${nextAgentLabel}`}
+                  </button>
+                )}
+
+                {isComplete && (
+                  <button
+                    onClick={() => setShowFinalReport(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: '10px 20px',
+                      background: COLORS.mint,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: '0.88em',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 10px rgba(22,148,84,0.3)',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <FileText size={14} />
+                    Show Final Report
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
 
-      <AgentGlassBoxLog agentRuns={agentRuns} activeAgents={activeAgents} isComplete={isComplete} t={t} />
+      <AgentGlassBoxLog agentRuns={agentRuns} activeAgents={activeAgents} isComplete={isComplete} finishedAgents={finishedAgents} t={t} />
+
+      <div ref={humanGateRef} />
+
+      {showFinalReport && (
+        <FinalReportDrawer
+          variant={scenario.memoVariant}
+          onClose={() => setShowFinalReport(false)}
+        />
+      )}
 
       {escalation && (
         <EscalationOverlay
@@ -1878,6 +2037,93 @@ function ReasoningStream({ reasoning, endRef, t, openSource, setOpenSource }) {
   );
 }
 
+function FinalReportDrawer({ variant, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(4,19,8,0.4)',
+          zIndex: 900,
+          backdropFilter: 'blur(2px)',
+        }}
+      />
+      <div
+        style={{
+          position: 'fixed',
+          top: 0, right: 0, bottom: 0,
+          width: 'min(780px, 92vw)',
+          background: COLORS.surface,
+          boxShadow: '-8px 0 48px rgba(0,0,0,0.18)',
+          zIndex: 901,
+          display: 'flex',
+          flexDirection: 'column',
+          animation: 'slide-in-right 0.28s ease-out both',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '16px 22px',
+            borderBottom: `1px solid ${COLORS.border}`,
+            background: COLORS.surfaceHi,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: 38, height: 38, borderRadius: 9,
+              background: `linear-gradient(135deg, ${COLORS.mint}, ${COLORS.teal})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          >
+            <FileText size={18} color="#fff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.72em', color: COLORS.textMute, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Final Report · AI-generated &amp; human-approved
+            </div>
+            <div style={{ fontSize: '1.05em', fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif", lineHeight: 1.25 }}>
+              {variant === 'compliance' ? 'Disbursement Anomaly Report · Rajshahi' : 'Q1 2026 Performance Review · Khulna Region'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 34, height: 34, borderRadius: 8,
+              border: `1px solid ${COLORS.border}`,
+              background: COLORS.surface,
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <X size={17} color={COLORS.textDim} />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 22px 32px' }} className="scrollbar-thin">
+          <MemoArtifact variant={variant} />
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 function EscalationOverlay({ onApprove, scenario, t, onViewLedger, canViewLedger }) {
   const esc = scenario.escalation;
   return (
@@ -1990,131 +2236,211 @@ function VerdictBlock({ title, rows, tone }) {
   );
 }
 
-function MemoArtifact({ variant }) {
-  if (variant === 'compliance') {
-    return (
-      <div className="anim-fade-up" style={{ marginTop: 22, padding: 28, borderRadius: 12, background: '#F8FAF9', color: '#0E1F15', border: `1px solid ${COLORS.borderHi}`, boxShadow: '0 24px 80px rgba(15, 36, 24, 0.1)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottom: '1px solid #DDE7E0', marginBottom: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 6, background: '#6B4C2D', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShieldAlert size={15} color="#fff" />
-            </div>
-            <div>
-              <div className="font-display" style={{ fontSize: '0.95em', fontWeight: 700, color: '#4A3720' }}>
-                PALLI KARMA-SAHAYAK FOUNDATION
-              </div>
-              <div style={{ fontSize: '0.72em', color: '#5A6B62', letterSpacing: 1, textTransform: 'uppercase' }}>
-                Risk &amp; compliance · Internal bulletin
-              </div>
-            </div>
-          </div>
-          <div className="font-mono" style={{ fontSize: '0.72em', color: '#5A6B62' }}>
-            CONFIDENTIAL · RJH-Q1
-          </div>
-        </div>
+function WBReportTable({ headers, rows, flagCol }) {
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82em', marginTop: 10, marginBottom: 4 }}>
+      <thead>
+        <tr>
+          {headers.map((h, i) => (
+            <th key={i} style={{ background: '#1A3C28', color: '#fff', padding: '8px 12px', textAlign: i === 0 ? 'left' : 'right', fontWeight: 700, letterSpacing: 0.4, whiteSpace: 'nowrap' }}>{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, ri) => {
+          const flagged = flagCol !== undefined && row[flagCol] === true;
+          return (
+            <tr key={ri} style={{ background: flagged ? '#FEF3C7' : ri % 2 === 0 ? '#F8FAF9' : '#FFFFFF' }}>
+              {row.filter((_, ci) => ci !== flagCol).map((cell, ci) => (
+                <td key={ci} style={{ padding: '7px 12px', borderBottom: '1px solid #DDE7E0', color: flagged ? '#92400E' : '#1A1A1A', textAlign: ci === 0 ? 'left' : 'right', fontWeight: flagged && ci === 0 ? 700 : 400 }}>{cell}</td>
+              ))}
+              {flagged && <td style={{ padding: '7px 8px', borderBottom: '1px solid #DDE7E0', textAlign: 'center' }}><span style={{ background: '#B45309', color: '#fff', fontSize: '0.72em', fontWeight: 700, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap' }}>⚑ FLAGGED</span></td>}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
 
-        <div className="font-display" style={{ fontSize: '1.35em', fontWeight: 700, marginBottom: 4, color: '#0E1F15' }}>
-          Disbursement anomaly cluster · Rajshahi
-        </div>
-        <div style={{ fontSize: '0.82em', color: '#5A6B62', marginBottom: 18 }}>
-          Ledger-cited findings · prepared by Agnetic AI · released under human approval gate
-        </div>
-
-        <Section title="Summary">
-          <p style={pStyle}>Four partner organisations show timing anomalies vs approved tranche calendar. PO-RJH-11 carries the highest combined severity score. No autonomous disbursement freeze was applied — confidence and policy route required human adjudication.</p>
-        </Section>
-
-        <Section title="Evidence chain">
-          <ul style={ulStyle}>
-            <li>
-              <strong>Rule engine:</strong> Tranche window violations flagged with rule IDs attached to each ledger row.
-            </li>
-            <li>
-              <strong>Portfolio link:</strong> Stressed exposure indices cross internal comfort band on two routes.
-            </li>
-            <li>
-              <strong>PO context:</strong> Reporting cadence dip correlates temporally — flagged as correlation for investigation, not proof.
-            </li>
-          </ul>
-        </Section>
-
-        <div style={{ marginTop: 22, padding: 14, background: '#FFF8E8', border: '1px solid #E8D4A8', borderRadius: 6, display: 'flex', gap: 10, alignItems: 'center' }}>
-          <FileCheck size={16} color="#6B4C2D" />
-          <div style={{ fontSize: '0.82em', color: '#4A3720' }}>
-            <strong>Audit trail:</strong> Rule citations · model confidence · reviewer acknowledgement · immutable log reference.
-          </div>
-        </div>
+function WBSection({ number, title, children }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, borderBottom: '2px solid #1A3C28', paddingBottom: 5, marginBottom: 12 }}>
+        <span style={{ fontSize: '0.78em', fontWeight: 800, color: '#169454', letterSpacing: 1, fontFamily: "'Syne', sans-serif", minWidth: 22 }}>{number}.</span>
+        <span style={{ fontSize: '0.92em', fontWeight: 800, color: '#1A3C28', textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: "'Syne', sans-serif" }}>{title}</span>
       </div>
-    );
-  }
+      {children}
+    </div>
+  );
+}
+
+function MemoArtifact({ variant }) {
+  const isCompliance = variant === 'compliance';
+
+  const reportMeta = isCompliance
+    ? { reportNo: 'PKSF-RC-2026-Q1-RJH', date: 'April 2026', region: 'Rajshahi Division', classification: 'RESTRICTED — FOR OFFICIAL USE ONLY', classColor: '#B45309', classBg: '#FEF3C7', title: 'Disbursement Anomaly Assessment', subtitle: 'Partner Organisation Compliance Review · Rajshahi Region · Q1 2026', preparedBy: 'Agnetic AI Risk Intelligence Module', reviewedBy: 'Chief Risk Officer, PKSF', icon: <ShieldAlert size={20} color="#fff" /> }
+    : { reportNo: 'PKSF-PM-2026-Q1-KHL', date: 'April 2026', region: 'Khulna Division', classification: 'CONFIDENTIAL — BOARD CIRCULATION ONLY', classColor: '#1A5C35', classBg: '#EEF7F1', title: 'Q1 2026 Partner Organisation Performance Review', subtitle: 'Regional Portfolio Analysis with Root-Cause Findings and Recommendations · Khulna Division', preparedBy: 'Agnetic AI Workflow · 9 Specialist Agents', reviewedBy: 'Programme Officer (authorised), PKSF', icon: <FileText size={20} color="#fff" /> };
 
   return (
-    <div className="anim-fade-up" style={{ marginTop: 22, padding: 28, borderRadius: 12, background: '#F8FAF9', color: '#0E1F15', border: `1px solid ${COLORS.borderHi}`, boxShadow: '0 24px 80px rgba(15, 36, 24, 0.1)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottom: '1px solid #DDE7E0', marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 6, background: '#1A5C35', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileText size={15} color="#fff" />
+    <div className="anim-fade-up" style={{ fontFamily: "'DM Sans', sans-serif", background: '#FFFFFF', color: '#1A1A1A', border: '1px solid #C9DDD2', borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 32px rgba(15,36,24,0.1)' }}>
+
+      {/* ── Cover header band ─────────────────────────────── */}
+      <div style={{ background: '#0D2818', padding: '22px 28px 18px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ width: 46, height: 46, borderRadius: 6, background: isCompliance ? '#6B4C2D' : '#169454', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+          {reportMeta.icon}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.68em', color: '#7CB898', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
+            Palli Karma-Sahayak Foundation · Official Report
           </div>
-          <div>
-            <div className="font-display" style={{ fontSize: '0.95em', fontWeight: 700, color: '#1A5C35' }}>
-              PALLI KARMA-SAHAYAK FOUNDATION
+          <div style={{ fontSize: '1.4em', fontWeight: 800, color: '#FFFFFF', fontFamily: "'Syne', sans-serif", lineHeight: 1.2, marginBottom: 6 }}>
+            {reportMeta.title}
+          </div>
+          <div style={{ fontSize: '0.82em', color: '#A8C9B4', lineHeight: 1.5 }}>{reportMeta.subtitle}</div>
+        </div>
+      </div>
+
+      {/* ── Classification banner ─────────────────────────── */}
+      <div style={{ background: reportMeta.classBg, borderBottom: `2px solid ${reportMeta.classColor}`, padding: '6px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.72em', fontWeight: 800, color: reportMeta.classColor, letterSpacing: 1.2, textTransform: 'uppercase' }}>{reportMeta.classification}</span>
+        <span className="font-mono" style={{ fontSize: '0.7em', color: reportMeta.classColor }}>{reportMeta.reportNo}</span>
+      </div>
+
+      {/* ── Document metadata grid ────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', borderBottom: '1px solid #DDE7E0' }}>
+        {[
+          ['Report No.', reportMeta.reportNo],
+          ['Date', reportMeta.date],
+          ['Region', reportMeta.region],
+          ['Status', 'Approved & Released'],
+        ].map(([label, value], i) => (
+          <div key={i} style={{ padding: '10px 16px', borderRight: i < 3 ? '1px solid #DDE7E0' : 'none', background: i % 2 === 0 ? '#F8FAF9' : '#FFFFFF' }}>
+            <div style={{ fontSize: '0.64em', color: '#5A6B62', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, marginBottom: 3 }}>{label}</div>
+            <div style={{ fontSize: '0.82em', color: '#1A3C28', fontWeight: 600 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '24px 28px 32px' }}>
+
+        {/* ── Abstract box ─────────────────────────────────── */}
+        <div style={{ border: '1.5px solid #1A3C28', borderLeft: '5px solid #169454', borderRadius: 3, padding: '14px 18px', marginBottom: 24, background: '#F4FAF6' }}>
+          <div style={{ fontSize: '0.68em', fontWeight: 800, color: '#169454', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Abstract</div>
+          <p style={{ margin: 0, fontSize: '0.85em', lineHeight: 1.7, color: '#1A3C28' }}>
+            {isCompliance
+              ? 'This report presents findings from an AI-assisted compliance review of disbursement patterns across four partner organisations in Rajshahi Division for Q1 2026. Four POs exhibit timing anomalies relative to the approved tranche calendar. PO-RJH-11 records the highest combined severity score. No autonomous action was taken; all findings were escalated for human adjudication in accordance with PKSF policy.'
+              : 'This report presents a performance assessment of 12 partner organisations operating in Khulna Division during Q1 2026. Ten organisations performed at or above the regional baseline. Two POs — PO-KHL-04 and PO-KHL-09 — are flagged for supervisory review. Root-cause analysis attributes the performance deviation primarily to environmental factors. One compliance flag was escalated and resolved under the AI-assisted human approval gate.'}
+          </p>
+        </div>
+
+        {isCompliance ? (
+          <>
+            <WBSection number="1" title="Background &amp; Scope">
+              <p style={pStyle}>The PKSF Compliance &amp; Risk Sentinel agent reviewed disbursement ledger entries for all Rajshahi-region partner organisations for the period 1 January – 31 March 2026. Rule-engine checks were applied against the approved tranche calendar. Four POs returned violations above the reporting threshold.</p>
+            </WBSection>
+
+            <WBSection number="2" title="Anomaly Findings">
+              <WBReportTable
+                headers={['Partner Org.', 'Tranche Violations', 'Severity Score', 'PAR-30 (%)', 'Status']}
+                rows={[
+                  ['PO-RJH-11', '4', '8.7 / 10', '9.2%', false],
+                  ['PO-RJH-07', '2', '5.1 / 10', '6.8%', false],
+                  ['PO-RJH-03', '3', '4.9 / 10', '5.4%', false],
+                  ['PO-RJH-15', '1', '2.3 / 10', '4.1%', false],
+                ]}
+              />
+              <p style={{ ...pStyle, marginTop: 10, fontStyle: 'italic', color: '#5A6B62' }}>Table 1 — Disbursement anomaly summary, Rajshahi Q1 2026. Severity score is a composite of violation count, exposure quantum, and PAR trend.</p>
+            </WBSection>
+
+            <WBSection number="3" title="Evidence Chain">
+              <ul style={ulStyle}>
+                <li><strong>Rule engine:</strong> Tranche window violations flagged with unique rule IDs attached to each ledger row for full traceability.</li>
+                <li><strong>Portfolio linkage:</strong> Stressed exposure indices cross the internal comfort band on two disbursement routes.</li>
+                <li><strong>Field correlation:</strong> Reporting cadence dip on PO-RJH-11 correlates temporally with anomaly cluster — flagged as correlation only, not confirmed causation.</li>
+              </ul>
+            </WBSection>
+
+            <WBSection number="4" title="Recommended Actions">
+              <ol style={olStyle}>
+                <li>Initiate a full ledger audit of PO-RJH-11 within 10 working days.</li>
+                <li>Place disbursements to PO-RJH-11 on supervisory hold pending audit completion.</li>
+                <li>Request documentary justification from PO-RJH-07 and PO-RJH-03 for the flagged tranche windows.</li>
+                <li>Escalate PO-RJH-11 findings to the Board Risk Committee at the next scheduled session.</li>
+              </ol>
+            </WBSection>
+          </>
+        ) : (
+          <>
+            <WBSection number="1" title="Background &amp; Scope">
+              <p style={pStyle}>This report covers the performance of all 12 PKSF-affiliated partner organisations operating in Khulna Division during Q1 2026 (1 January – 31 March). Performance metrics were drawn from the MIS core system. Field data synthesis and beneficiary income analysis were carried out by specialist AI agents and verified against programme records.</p>
+            </WBSection>
+
+            <WBSection number="2" title="Key Performance Indicators">
+              <WBReportTable
+                headers={['Partner Org.', 'On-Time Repayment', 'PAR-30 (%)', 'Active Borrowers', 'Deviation (σ)', '_flag']}
+                flagCol={5}
+                rows={[
+                  ['PO-KHL-01', '82.1%', '2.8%', '1,240', '+0.5σ', false],
+                  ['PO-KHL-02', '79.6%', '3.6%', '890', '+0.1σ', false],
+                  ['PO-KHL-03', '81.3%', '3.1%', '1,105', '+0.4σ', false],
+                  ['PO-KHL-04', '47.2%', '11.4%', '1,580', '−2.1σ', true],
+                  ['PO-KHL-05', '77.8%', '4.2%', '730', '−0.1σ', false],
+                  ['PO-KHL-06', '80.5%', '3.9%', '960', '+0.3σ', false],
+                  ['PO-KHL-07', '83.2%', '2.5%', '1,410', '+0.6σ', false],
+                  ['PO-KHL-08', '78.9%', '4.0%', '820', '0.0σ', false],
+                  ['PO-KHL-09', '53.8%', '8.7%', '1,200', '−1.7σ', true],
+                  ['PO-KHL-10', '80.1%', '3.3%', '1,050', '+0.3σ', false],
+                  ['PO-KHL-11', '77.3%', '4.5%', '670', '−0.1σ', false],
+                  ['PO-KHL-12', '81.7%', '3.0%', '980', '+0.4σ', false],
+                ]}
+              />
+              <p style={{ ...pStyle, marginTop: 8, fontStyle: 'italic', color: '#5A6B62' }}>Table 1 — Partner organisation performance scorecard, Khulna Q1 2026. Regional baseline: 78.4% on-time repayment · PAR-30: 4.1%.</p>
+            </WBSection>
+
+            <WBSection number="3" title="Root-Cause Analysis">
+              <p style={pStyle}><strong>PO-KHL-04 (Dacope &amp; Koyra sub-districts):</strong> Field officer logs and beneficiary income data confirm that approximately 340 borrowers experienced temporary income disruption due to March 2026 flooding. The performance dip is assessed as environmental in origin. Recovery to baseline is projected by Q2 2026 subject to approved grace measures.</p>
+              <p style={pStyle}><strong>PO-KHL-09:</strong> A compliance flag was raised on a tranche disbursement timing discrepancy. The flag was reviewed and acknowledged by the authorised programme officer under the AI-assisted human approval gate. A full ledger audit is recommended prior to the next disbursement cycle.</p>
+            </WBSection>
+
+            <WBSection number="4" title="Recommendations">
+              <ol style={olStyle}>
+                <li>Approve a <strong>60-day repayment grace window</strong> for approximately 340 affected borrowers in PO-KHL-04's service area (Dacope and Koyra), effective April 2026.</li>
+                <li>Authorise a <strong>full ledger audit of PO-KHL-09</strong> prior to the Q2 2026 tranche disbursement cycle.</li>
+                <li>Brief the <strong>donor reporting team</strong> on the environmental context for PO-KHL-04 to pre-empt portfolio-stress queries from external stakeholders.</li>
+                <li>Commission a <strong>climate-risk mapping exercise</strong> for flood-prone service areas to build forward-looking adjustment parameters into the performance model.</li>
+              </ol>
+            </WBSection>
+          </>
+        )}
+
+        {/* ── Approval & signature block ────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 8, marginBottom: 20 }}>
+          {[
+            { label: 'Prepared by', value: reportMeta.preparedBy, sub: 'AI-assisted analysis' },
+            { label: 'Reviewed &amp; approved by', value: reportMeta.reviewedBy, sub: 'Human approval gate — signed' },
+          ].map(({ label, value, sub }, i) => (
+            <div key={i} style={{ border: '1px solid #C9DDD2', borderTop: '3px solid #169454', borderRadius: 3, padding: '12px 14px' }}>
+              <div style={{ fontSize: '0.65em', color: '#5A6B62', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }} dangerouslySetInnerHTML={{ __html: label }} />
+              <div style={{ fontSize: '0.88em', fontWeight: 700, color: '#1A3C28', marginBottom: 3 }}>{value}</div>
+              <div style={{ fontSize: '0.72em', color: '#5A6B62' }}>{sub}</div>
             </div>
-            <div style={{ fontSize: '0.72em', color: '#5A6B62', letterSpacing: 1, textTransform: 'uppercase' }}>
-              Internal board briefing · Confidential
-            </div>
+          ))}
+        </div>
+
+        {/* ── Audit trail ───────────────────────────────────── */}
+        <div style={{ background: '#F4FAF6', border: '1px solid #C9DDD2', borderLeft: '4px solid #169454', borderRadius: 3, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <CheckCircle2 size={17} color="#169454" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: '0.78em', color: '#1A3C28', lineHeight: 1.6 }}>
+            <strong>Audit &amp; Traceability:</strong> This document was produced by a multi-agent AI workflow comprising {isCompliance ? '6' : '9'} specialist agents. All intermediate reasoning steps, tool calls, data citations, and human approval decisions are stored in the immutable run log. Report released under PKSF policy gate. Classification: {isCompliance ? 'Restricted' : 'Confidential'}.
           </div>
         </div>
-        <div className="font-mono" style={{ fontSize: '0.72em', color: '#5A6B62' }}>
-          AUTO-GENERATED · APR 2026
-        </div>
       </div>
 
-      <div className="font-display" style={{ fontSize: '1.35em', fontWeight: 700, marginBottom: 4, color: '#0E1F15' }}>
-        Q1 2026 Performance review · Khulna region
-      </div>
-      <div style={{ fontSize: '0.82em', color: '#5A6B62', marginBottom: 18 }}>
-        Partner organisation analysis · prepared by Agnetic AI · reviewed and approved by [Officer name]
-      </div>
-
-      <Section title="Executive summary">
-        <p style={pStyle}>
-          12 partner organisations operated in Khulna during Q1 2026. 10 performed within or above the regional baseline. <strong>Two POs flagged for review:</strong> PO-KHL-04 (47.2% on-time repayment) and PO-KHL-09 (53.8% on-time). Root-cause analysis indicates the dip is largely environmental, not managerial. One compliance flag on PO-KHL-09 was reviewed and acknowledged by the authorised reviewer.
-        </p>
-      </Section>
-
-      <Section title="Findings">
-        <ul style={ulStyle}>
-          <li>
-            <strong>Regional baseline:</strong> 78.4% on-time repayment · PAR-30: 4.1%.
-          </li>
-          <li>
-            <strong>PO-KHL-04:</strong> 47.2% on-time (<span style={{ color: '#B85C42' }}>−2.1σ</span>). Service area in Dacope and Koyra hit by Q1 flooding.
-          </li>
-          <li>
-            <strong>PO-KHL-09:</strong> 53.8% on-time (<span style={{ color: '#B85C42' }}>−1.7σ</span>). Compliance flag on tranche disbursement — under human review.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title="Root causes">
-        <p style={pStyle}>
-          Field officer logs and beneficiary income data confirm that approximately 340 borrowers in PO-KHL-04&apos;s area experienced temporary income disruption due to March flooding. Performance is expected to recover by Q2 with appropriate grace measures. PO-KHL-09 root-cause investigation is pending ledger audit.
-        </p>
-      </Section>
-
-      <Section title="Recommendations">
-        <ol style={olStyle}>
-          <li>Approve a temporary 60-day repayment grace window for affected borrowers in PO-KHL-04&apos;s service area.</li>
-          <li>Authorise a full ledger audit of PO-KHL-09 prior to next tranche disbursement.</li>
-          <li>Brief the donor reporting team on the environmental context to pre-empt portfolio-stress queries.</li>
-        </ol>
-      </Section>
-
-      <div style={{ marginTop: 22, padding: 14, background: '#EEF7F1', border: '1px solid #C9E0CE', borderRadius: 6, display: 'flex', gap: 10, alignItems: 'center' }}>
-        <CheckCircle2 size={16} color="#1A5C35" />
-        <div style={{ fontSize: '0.82em', color: '#1A5C35' }}>
-          <strong>Audit trail:</strong> Multiple specialists · tool calls · two human gates (escalation + external release) · full reasoning chain stored. Click source chips in the live system to drill down.
-        </div>
+      {/* ── Footer ────────────────────────────────────────── */}
+      <div style={{ background: '#0D2818', padding: '10px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <span style={{ fontSize: '0.68em', color: '#7CB898', letterSpacing: 0.8 }}>Palli Karma-Sahayak Foundation · Agnetic AI Workflow</span>
+        <span className="font-mono" style={{ fontSize: '0.68em', color: '#7CB898' }}>{reportMeta.reportNo} · {reportMeta.date} · {reportMeta.classification.split('—')[0].trim()}</span>
       </div>
     </div>
   );
@@ -2124,13 +2450,3 @@ const pStyle = { fontSize: '0.82em', lineHeight: 1.65, color: '#1F3329', margin:
 const ulStyle = { fontSize: '0.82em', lineHeight: 1.7, color: '#1F3329', paddingLeft: 18, margin: '6px 0' };
 const olStyle = { fontSize: '0.82em', lineHeight: 1.7, color: '#1F3329', paddingLeft: 20, margin: '6px 0' };
 
-function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <div className="font-display" style={{ fontSize: '0.82em', fontWeight: 700, color: '#1A5C35', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
