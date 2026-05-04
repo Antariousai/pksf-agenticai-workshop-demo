@@ -953,6 +953,7 @@ function AgentRunCard({ run, isDone, t }) {
         border: `1.5px solid ${isDone ? (hovered ? COLORS.mintDim : COLORS.mint) : COLORS.amber}`,
         background: isDone && hovered ? '#F7FCF9' : COLORS.surface,
         overflow: 'hidden',
+        flexShrink: 0,
         cursor: canOpen ? 'pointer' : 'default',
         transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
         boxShadow: isDone && hovered ? `0 4px 18px rgba(22,148,84,0.13)` : 'none',
@@ -1004,18 +1005,29 @@ function AgentRunCard({ run, isDone, t }) {
         </div>
       </div>
 
-      {/* Bottom row: report title or working state + open hint */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px' }}>
+      {/* Bottom row: "WHAT THIS SPECIALIST PRODUCED" — always visible */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
+          borderTop: `2px solid ${isDone ? COLORS.mintDim : COLORS.amber}`,
+          background: isDone ? COLORS.surfaceHi : '#FEF3C7',
+        }}
+      >
         <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: '0.7em', fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: 1.2, marginBottom: 5,
+              color: isDone ? COLORS.mint : COLORS.amber,
+            }}
+          >
+            {t('agentStructuredOutput')}
+          </div>
           {isDone ? (
-            <>
-              <div style={{ fontSize: '0.72em', color: COLORS.textMute, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.06, marginBottom: 3 }}>
-                {t('agentStructuredOutput')}
-              </div>
-              <div style={{ fontSize: '0.95em', fontWeight: 700, color: COLORS.text, lineHeight: 1.3 }}>
-                {reportTitle ?? run.output ?? '—'}
-              </div>
-            </>
+            <div style={{ fontSize: '0.95em', fontWeight: 700, color: COLORS.text, lineHeight: 1.3 }}>
+              {reportTitle ?? run.output ?? '—'}
+            </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: COLORS.amber, fontSize: '0.9em', fontStyle: 'italic' }}>
               <Loader2 size={13} className="spin" />
@@ -1029,7 +1041,7 @@ function AgentRunCard({ run, isDone, t }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 14px', borderRadius: 8,
-              background: hovered ? COLORS.mint : COLORS.surfaceHi,
+              background: hovered ? COLORS.mint : COLORS.surface,
               color: hovered ? '#fff' : COLORS.mint,
               border: `1.5px solid ${COLORS.mint}`,
               fontSize: '0.85em', fontWeight: 700,
@@ -1065,6 +1077,14 @@ function AgentRunCard({ run, isDone, t }) {
 
 function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, t }) {
   const currentAgentId = activeAgents[activeAgents.length - 1];
+  const scrollRef = useRef(null);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [agentRuns.length]);
 
   if (agentRuns.length === 0) {
     return (
@@ -1104,7 +1124,11 @@ function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, t }) {
           <div style={{ fontSize: '0.92em', color: COLORS.textDim, marginTop: 4, lineHeight: 1.45 }}>{t('glassBoxSub')}</div>
         </div>
       </div>
-      <div className="scrollbar-thin" style={{ maxHeight: 600, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div
+        ref={scrollRef}
+        className="scrollbar-thin"
+        style={{ maxHeight: 640, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}
+      >
         {agentRuns.map((run) => (
           <AgentRunCard
             key={run.id}
@@ -1113,6 +1137,7 @@ function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, t }) {
             t={t}
           />
         ))}
+        <div ref={bottomRef} style={{ height: 1 }} />
       </div>
     </div>
   );
