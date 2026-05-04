@@ -19,7 +19,7 @@ import {
   ScrollText,
   FileCheck,
 } from 'lucide-react';
-import { COMPLIANCE_AGENT_GLASS, KHULNA_AGENT_GLASS } from './pksf_agent_glass_data.js';
+import { COMPLIANCE_AGENT_GLASS, KHULNA_AGENT_GLASS, ME_AGENT_GLASS, FIELD_AGENT_GLASS } from './pksf_agent_glass_data.js';
 
 const khAgent = (delay, id, presenterNote) => ({
   delay,
@@ -35,6 +35,22 @@ const coAgent = (delay, id, presenterNote) => ({
   id,
   presenterNote,
   ...COMPLIANCE_AGENT_GLASS[id],
+});
+
+const meAgent = (delay, id, presenterNote) => ({
+  delay,
+  type: 'agent',
+  id,
+  presenterNote,
+  ...ME_AGENT_GLASS[id],
+});
+
+const fieldAgent = (delay, id, presenterNote) => ({
+  delay,
+  type: 'agent',
+  id,
+  presenterNote,
+  ...FIELD_AGENT_GLASS[id],
 });
 
 export const COLORS = {
@@ -69,6 +85,69 @@ export const AGENTS = [
   { id: 'a9', n: 9, name: 'Programme Forecasting', role: 'Scenario modelling', icon: Sparkles },
 ];
 
+export const DEPARTMENTS = [
+  {
+    id: 'programme',
+    label: 'Programme Management',
+    dataSource: 'PKSF MIS Core — Programme Module',
+    userRole: 'Senior Programme Manager',
+    userEmail: 's.rahman@pksf.org.bd',
+    scenarioKeys: ['khulna'],
+    misSteps: [
+      'Authenticating — Senior Programme Manager',
+      'Connecting to PKSF MIS Core — Programme Module',
+      'Loading Khulna regional dataset — Q1 2026',
+      'Verifying partner organisation access permissions',
+      'Data access granted — initialising workflow',
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance & Compliance',
+    dataSource: 'PKSF MIS Core — Finance & Audit Module',
+    userRole: 'Finance & Compliance Officer',
+    userEmail: 'a.chowdhury@pksf.org.bd',
+    scenarioKeys: ['compliance'],
+    misSteps: [
+      'Authenticating — Finance & Compliance Officer',
+      'Connecting to PKSF MIS Core — Finance & Audit Module',
+      'Loading Rajshahi disbursement ledger — Q1 2026',
+      'Fetching tranche rule engine configuration',
+      'Compliance audit session initialised',
+    ],
+  },
+  {
+    id: 'me',
+    label: 'Monitoring & Evaluation',
+    dataSource: 'PKSF MIS Core — M&E Module + PDO Log Frame',
+    userRole: 'M&E Specialist',
+    userEmail: 'n.islam@pksf.org.bd',
+    scenarioKeys: ['me_dhaka'],
+    misSteps: [
+      'Authenticating — M&E Specialist',
+      'Connecting to PKSF MIS Core — M&E Module',
+      'Pulling PDO log frame indicators — Dhaka Division',
+      'Loading Q1 2026 beneficiary and indicator datasets',
+      'M&E workspace ready',
+    ],
+  },
+  {
+    id: 'field',
+    label: 'Field Operations',
+    dataSource: 'Field Reporting System (FRS) + PKSF MIS',
+    userRole: 'Field Coordinator',
+    userEmail: 'k.begum@pksf.org.bd',
+    scenarioKeys: ['field_sylhet'],
+    misSteps: [
+      'Authenticating — Field Coordinator',
+      'Connecting to Field Reporting System (FRS)',
+      'Syncing Sylhet field visit records — Q1 2026',
+      'Loading borrower contact and PO coordination data',
+      'Field operations workspace ready',
+    ],
+  },
+];
+
 export const UI_STRINGS = {
   en: {
     headerTitle: 'Agnetic AI',
@@ -83,7 +162,7 @@ export const UI_STRINGS = {
     running: 'Running…',
     runAgain: 'Play again',
     reset: 'Start over',
-    userPromptLabel: 'Example question from a programme manager',
+    userPromptLabel: 'Example prompt from a programme manager (Dummy)',
     chatbotTitle: 'Plain chatbot (for comparison)',
     chatbotSub: 'One general reply. It cannot open PKSF systems or verify numbers.',
     agentTitle: 'Agnetic AI workflow (for comparison)',
@@ -164,7 +243,7 @@ export const UI_STRINGS = {
     running: 'চলছে…',
     runAgain: 'আবার চালান',
     reset: 'আবার শুরু',
-    userPromptLabel: 'প্রোগ্রাম ব্যবস্থাপকের একটি নমুনা প্রশ্ন',
+    userPromptLabel: 'প্রোগ্রাম ব্যবস্থাপকের একটি নমুনা প্রম্পট (ডামি)',
     chatbotTitle: 'সাধারণ চ্যাটবট (তুলনার জন্য)',
     chatbotSub: 'একটি সাধারণ উত্তর। এটি পিকেএসএফের সিস্টেম খুলতে বা সংখ্যা যাচাই করতে পারে না।',
     agentTitle: 'এজেন্টিক AI কাজের ধারা (তুলনার জন্য)',
@@ -347,10 +426,98 @@ const COMPLIANCE_TASKS = [
   { id: 'c4', label: 'Draft confidential compliance bulletin with citations' },
 ];
 
+const ME_TASKS = [
+  { id: 'me1', label: 'Pull Q1 2026 PDO indicator matrix for Dhaka' },
+  { id: 'me2', label: 'Check PO M&E reporting compliance (deadlines)' },
+  { id: 'me3', label: 'Analyse beneficiary reach vs log frame targets' },
+  { id: 'me4', label: 'Investigate field coverage gaps for off-track indicators' },
+  { id: 'me5', label: 'Compile donor-ready M&E snapshot with explanations' },
+];
+
+const FIELD_TASKS = [
+  { id: 'fl1', label: 'Pull and analyse Q1 field officer visit records for Sylhet' },
+  { id: 'fl2', label: 'Identify under-served borrowers in low-coverage zones' },
+  { id: 'fl3', label: 'Cross-check PO coordination reports for transport issues' },
+  { id: 'fl4', label: 'Draft programme note with recommendations and Q2 forecast' },
+];
+
+function meScript() {
+  return [
+    { delay: 500, type: 'reason', text: 'Instruction received: Q1 2026 M&E review for Dhaka division. Routing to M&E specialist chain.', presenterNote: 'M&E department view — PDO indicators focus.' },
+    meAgent(700, 'a1', 'Freya orchestrates M&E chain.'),
+    { delay: 500, type: 'reason', text: 'Intent confirmed: indicator review + donor snapshot. Activating 5 specialists.', presenterNote: 'Same agents, M&E-first routing.' },
+    { delay: 300, type: 'task', id: 'me1', state: 'active' },
+    { delay: 200, type: 'task', id: 'me2', state: 'active' },
+    { delay: 200, type: 'task', id: 'me3', state: 'active' },
+    { delay: 200, type: 'task', id: 'me4', state: 'active' },
+    { delay: 200, type: 'task', id: 'me5', state: 'active' },
+    meAgent(600, 'a2', 'Agent 02 leads — M&E indicator matrix.'),
+    { delay: 300, type: 'tool', icon: Database, label: 'pdo_indicators · region=Dhaka · Q1-2026 · logframe=v3' },
+    { delay: 700, type: 'reason', text: '12 PDO indicators pulled. 3 deviate beyond 10% threshold: beneficiary reach (−12%), disbursement utilisation (−11%), income growth proxy (+14% ahead).', sources: [{ id: 'me-ind', label: 'PDO Log Frame · Dhaka', detail: 'Q1 2026 actuals vs approved targets · signed M&E extract · refreshed monthly.' }] },
+    { delay: 200, type: 'task', id: 'me1', state: 'done' },
+    meAgent(600, 'a3', 'Agent 03 — PO reporting compliance.'),
+    { delay: 300, type: 'tool', icon: Database, label: 'po_reporting_schedule · region=Dhaka · Q1-2026 → 14 POs' },
+    { delay: 600, type: 'reason', text: 'PO M&E reporting: 12 of 14 on time. PO-DHK-06 (+8 days late), PO-DHK-11 (+13 days late).', presenterNote: 'Same agent, M&E compliance lens.' },
+    { delay: 200, type: 'task', id: 'me2', state: 'done' },
+    meAgent(600, 'a5', 'Agent 05 — beneficiary reach analytics.'),
+    { delay: 300, type: 'tool', icon: Calculator, label: 'beneficiary_reach · segment=gender+cohort · Dhaka Q1' },
+    { delay: 700, type: 'reason', text: 'Beneficiary reach: 7,480 (88% of 8,500 target). Female participation: 74.2% — above 70% threshold. New borrower pipeline: 1,240.', sources: [{ id: 'me-bene', label: 'MIS beneficiary register', detail: 'Active borrower counts by gender, cohort, and sub-district · Q1 2026.' }] },
+    { delay: 200, type: 'task', id: 'me3', state: 'done' },
+    meAgent(600, 'a4', 'Agent 04 — field investigation for reach gap.'),
+    { delay: 400, type: 'tool', icon: Search, label: 'field_visits · sub_district IN (Bijoynagar, Savar) · Q1-2026' },
+    { delay: 700, type: 'reason', text: 'Root cause found: planned officer transitions in Bijoynagar and Savar (Feb 2026) caused ~120 missed visits. Replacements now in post. Q2 recovery expected.' },
+    { delay: 200, type: 'task', id: 'me4', state: 'done' },
+    meAgent(600, 'a7', 'Agent 07 — compile donor M&E update.'),
+    { delay: 400, type: 'tool', icon: ScrollText, label: 'compile_me_donor_update · Dhaka · sections=4 · ~2 pages' },
+    { delay: 800, type: 'reason', text: 'Drafting M&E donor update. Flagged indicators explained: reach shortfall (staff transition, resolved), utilisation (Q4 reallocation), income proxy (positive overshoot).' },
+    { delay: 200, type: 'task', id: 'me5', state: 'done' },
+    { delay: 400, type: 'tool', icon: FileCheck, label: 'PKSF_Dhaka_Q1-2026_Donor_ME_Update.pdf · draft ready' },
+    { delay: 400, type: 'humanMemoGate', presenterNote: 'Donor document requires human release gate.' },
+    { delay: 400, type: 'artifact', presenterNote: 'Reveal M&E donor update.' },
+  ];
+}
+
+function fieldScript() {
+  return [
+    { delay: 500, type: 'reason', text: 'Instruction received: synthesise Q1 field data for Sylhet division. Identify service delivery gaps. Field-operations chain activated.', presenterNote: 'Field Ops view — same agents, field-first routing.' },
+    fieldAgent(700, 'a1', 'Freya orchestrates field-ops chain.'),
+    { delay: 500, type: 'reason', text: 'Intent confirmed: field synthesis + programme note. Routing to field-specialist chain.', presenterNote: 'Note different agent order vs programme view.' },
+    { delay: 300, type: 'task', id: 'fl1', state: 'active' },
+    { delay: 200, type: 'task', id: 'fl2', state: 'active' },
+    { delay: 200, type: 'task', id: 'fl3', state: 'active' },
+    { delay: 200, type: 'task', id: 'fl4', state: 'active' },
+    fieldAgent(600, 'a4', 'Agent 04 leads — field visit analysis.'),
+    { delay: 300, type: 'tool', icon: Database, label: 'field_visits · region=Sylhet · Q1-2026 → 847 records' },
+    { delay: 700, type: 'reason', text: '4 of 22 Sylhet sub-districts below 80% visit target. Transport constraints flagged in Jaintiapur (68.9%) and Gowainghat (71.1%).', sources: [{ id: 'fld-syl', label: 'FRS · Sylhet Q1 visit log', detail: 'Field Reporting System extract · 847 visit records · officer + sub-district breakdown.' }] },
+    { delay: 200, type: 'task', id: 'fl1', state: 'done' },
+    fieldAgent(600, 'a5', 'Agent 05 — borrower contact gap analysis.'),
+    { delay: 400, type: 'tool', icon: Calculator, label: 'borrower_contacts · gap_zones=Sylhet · threshold=2 contacts' },
+    { delay: 700, type: 'reason', text: '580 of 1,340 borrowers in gap sub-districts had fewer than 2 officer contacts in Q1. Arrears correlation with low contact: +2.1σ above mean.' },
+    { delay: 200, type: 'task', id: 'fl2', state: 'done' },
+    fieldAgent(600, 'a3', 'Agent 03 — PO coordination check.'),
+    { delay: 400, type: 'tool', icon: Search, label: 'po_narratives · region=Sylhet · keyword=transport · Q1-2026' },
+    { delay: 700, type: 'reason', text: 'PO-SYL-04 and PO-SYL-07 both self-flagged transport cost constraints in their Q1 narrative submissions. Issue pre-identified at PO level.', sources: [{ id: 'po-syl', label: 'PO Q1 narrative submissions · Sylhet', detail: 'Keyword scan of PO narrative sections · transport mentioned in 2 of 3 gap-zone PO reports.' }] },
+    { delay: 400, type: 'escalate', presenterNote: 'Transport allocation decision requires human sign-off.' },
+    { delay: 500, type: 'reason', text: 'Field coordinator acknowledged. Proceeding to programme note with transport uplift recommendation.' },
+    fieldAgent(600, 'a7', 'Agent 07 — draft field programme note.'),
+    { delay: 400, type: 'tool', icon: ScrollText, label: 'compile_programme_note · Sylhet · sections=3 · recommendations=3' },
+    { delay: 800, type: 'reason', text: 'Programme note drafted: transport uplift approval, costed mitigation plan from PO-SYL-04/07, Q2 priority visits to 580 under-contacted borrowers.' },
+    { delay: 200, type: 'task', id: 'fl3', state: 'done' },
+    { delay: 400, type: 'tool', icon: FileCheck, label: 'PKSF_Sylhet_Q1-2026_Field_Programme_Note.pdf · draft' },
+    { delay: 400, type: 'humanMemoGate', presenterNote: 'Programme note requires authorised sign-off before circulation.' },
+    fieldAgent(500, 'a9', 'Agent 09 — Q2 recovery forecast.'),
+    { delay: 500, type: 'reason', text: 'Forecast: with transport uplift, 89% visit target achievable Q2 end. Under-contacted borrowers fall from 580 to ~180. PAR risk contained if implemented by May 2026.', presenterNote: 'Forward view closes the story arc.' },
+    { delay: 200, type: 'task', id: 'fl4', state: 'done' },
+    { delay: 400, type: 'artifact', presenterNote: 'Reveal field programme note.' },
+  ];
+}
+
 export const SCENARIOS = {
   khulna: {
     key: 'khulna',
     label: 'Khulna Q1 regional review',
+    region: 'Khulna Division',
+    period: 'Q1 2026',
     escalation: {
       headline: 'PO-KHL-09',
       body:
@@ -381,9 +548,69 @@ Note: I don't have access to PKSF's actual data or systems, so I cannot perform 
     verdictDeliverable: 'Q1 2026 Khulna board briefing memo · 3 pages',
     decompositionHint: '7 sub-tasks',
   },
+  me_dhaka: {
+    key: 'me_dhaka',
+    label: 'Dhaka M&E indicator review',
+    region: 'Dhaka Division',
+    period: 'Q1 2026',
+    escalation: null,
+    memoGate: {
+      headline: 'M&E donor update · external release',
+      body: 'Document contains PDO indicator actuals and programme narrative. Release to donor channels requires M&E Specialist sign-off.',
+    },
+    demoPrompt:
+      'Run the Q1 2026 M&E indicator review for Dhaka division. Identify off-track PDO indicators, explain any shortfalls, and produce a donor-ready M&E snapshot.',
+    chatbotResponse: `Here is a generic M&E review outline you could follow:
+
+1. Collect Q1 2026 actuals against your log frame targets
+2. Identify indicators deviating more than 10% from plan
+3. Investigate root causes for any shortfalls
+4. Document narrative explanations for donor reports
+5. Compile into a standard donor-facing M&E update template
+
+I cannot access PKSF's M&E database, PDO log frames, or field data to produce a real indicator report.`,
+    tasks: ME_TASKS,
+    script: meScript(),
+    memoVariant: 'khulna',
+    verdictDeliverable: 'Dhaka Q1 2026 M&E donor update · 2 pages',
+    decompositionHint: '5 sub-tasks',
+  },
+  field_sylhet: {
+    key: 'field_sylhet',
+    label: 'Sylhet field data synthesis',
+    region: 'Sylhet Division',
+    period: 'Q1 2026',
+    escalation: {
+      headline: 'Transport uplift request',
+      body: 'PO-SYL-04 and PO-SYL-07 have self-flagged transport constraints. Approving an uplift requires budget authorisation from a Field Coordinator.',
+      viewLedgerSourceId: 'po-syl',
+    },
+    memoGate: {
+      headline: 'Field programme note · internal circulation',
+      body: 'Programme note contains PO-level operational detail. Internal release requires field coordinator authorisation.',
+    },
+    demoPrompt:
+      'Synthesise field officer visit data for Sylhet division in Q1 2026. Identify service delivery gaps, link them to borrower risk, and produce a programme note with recommendations.',
+    chatbotResponse: `Here is a generic field data synthesis approach:
+
+1. Collect visit logs from field officers across all sub-districts
+2. Compare actual visit frequencies against targets
+3. Identify sub-districts with coverage gaps
+4. Investigate causes — staffing, transport, access
+5. Recommend corrective action in a programme note
+
+I cannot access PKSF's Field Reporting System or borrower contact data to perform this analysis.`,
+    tasks: FIELD_TASKS,
+    script: fieldScript(),
+    memoVariant: 'khulna',
+    verdictDeliverable: 'Sylhet Q1 2026 field programme note · 2 pages',
+    decompositionHint: '4 sub-tasks',
+  },
   compliance: {
     key: 'compliance',
     label: 'Rajshahi compliance sweep',
+    region: 'Rajshahi Division',
+    period: 'Q1 2026',
     escalation: {
       headline: 'PO-RJH-11',
       body:

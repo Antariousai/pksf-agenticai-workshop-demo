@@ -31,6 +31,7 @@ import {
 import {
   AGENTS,
   COLORS,
+  DEPARTMENTS,
   SCENARIOS,
   UI_STRINGS,
 } from './pksf_demo_scenarios.js';
@@ -57,6 +58,13 @@ export default function PKSFAgentDemo() {
   const [stepCursor, setStepCursor] = useState(0);
   const [pausedVisual, setPausedVisual] = useState(false);
   const [finishedAgents, setFinishedAgents] = useState([]);
+
+  const [department, setDepartment] = useState('programme');
+  const [misPhase, setMisPhase] = useState('idle'); // 'idle' | 'connecting' | 'ready'
+  const [misSteps, setMisSteps] = useState([]);
+  const [authOpen, setAuthOpen] = useState(false);  // fake login modal
+  const [authPhase, setAuthPhase] = useState('idle'); // 'idle' | 'authenticating' | 'done'
+  const authResolverRef = useRef(null);
 
   const escalationResolver = useRef(null);
   const memoGateResolver = useRef(null);
@@ -104,6 +112,11 @@ export default function PKSFAgentDemo() {
     setShowArtifact(false);
     setAgentRuns([]);
     setFinishedAgents([]);
+    setMisPhase('idle');
+    setMisSteps([]);
+    setAuthOpen(false);
+    setAuthPhase('idle');
+    authResolverRef.current = null;
     currentAgentIdRef.current = null;
     setPresenterNoteStep(-1);
     stepIdxRef.current = 0;
@@ -114,7 +127,16 @@ export default function PKSFAgentDemo() {
 
   useEffect(() => {
     reset();
+    setMisPhase('idle');
+    setMisSteps([]);
   }, [scenarioKey, reset]);
+
+  useEffect(() => {
+    const dept = DEPARTMENTS.find((d) => d.id === department);
+    if (dept && dept.scenarioKeys.length > 0) {
+      setScenarioKey(dept.scenarioKeys[0]);
+    }
+  }, [department]);
 
   const applyStep = async (step, stepIdx) => {
     setPresenterNoteStep(stepIdx);
@@ -190,9 +212,15 @@ export default function PKSFAgentDemo() {
     }
   };
 
+  // Per-type delay multipliers — keeps task ticks fast while giving viewers
+  // enough time to read reasoning text and absorb agent transitions.
+  const DELAY_SCALE = { reason: 3.5, agent: 3.2, tool: 2.8, task: 1.8, default: 2.8 };
+  const scaledDelay = (step) =>
+    Math.round((step.delay ?? 0) * (DELAY_SCALE[step.type] ?? DELAY_SCALE.default));
+
   const runChatbot = async () => {
     setChatbotState('thinking');
-    await sleep(2400);
+    await sleep(4000);
     setChatbotState('done');
   };
 
@@ -201,23 +229,50 @@ export default function PKSFAgentDemo() {
     reset();
     await sleep(40);
     abortRef.current = false;
+
+    // Auth gate — show fake login modal and wait for user to sign in
+    setAuthOpen(true);
+    setAuthPhase('idle');
+    await new Promise((resolve) => { authResolverRef.current = resolve; });
+    if (abortRef.current) return;
+
     pauseRef.current = false;
     setPausedVisual(false);
     setRunning(true);
 
-    runChatbot();
+    // MIS connection phase (runs in both auto and step mode)
+    const dept = DEPARTMENTS.find((d) => d.id === department);
+    if (dept) {
+      setMisPhase('connecting');
+      setMisSteps([]);
+      for (const step of dept.misSteps) {
+        if (abortRef.current) return;
+        await sleep(1100);
+        setMisSteps((prev) => [...prev, step]);
+      }
+      await sleep(800);
+      setMisPhase('ready');
+      await sleep(1200);
+      setMisPhase('idle');
+      setMisSteps([]);
+    }
+
+    if (abortRef.current) return;
 
     const script = activeScenario.script;
     if (stepMode) {
       stepIdxRef.current = 0;
       setStepCursor(0);
+      runChatbot();
       setRunning(false);
       return;
     }
 
+    runChatbot();
+
     for (let i = 0; i < script.length; i++) {
       if (abortRef.current) break;
-      await waitMs(script[i].delay);
+      await waitMs(scaledDelay(script[i]));
       if (abortRef.current) break;
       await applyStep(script[i], i);
     }
@@ -225,6 +280,19 @@ export default function PKSFAgentDemo() {
       setCompleted(true);
     }
     setRunning(false);
+  };
+
+  const handleAuthSignIn = async () => {
+    setAuthPhase('authenticating');
+    await sleep(1600);
+    setAuthPhase('done');
+    await sleep(500);
+    setAuthOpen(false);
+    setAuthPhase('idle');
+    if (authResolverRef.current) {
+      authResolverRef.current();
+      authResolverRef.current = null;
+    }
   };
 
   const runStepForward = useCallback(async () => {
@@ -286,7 +354,7 @@ export default function PKSFAgentDemo() {
 
     for (let i = startIdx; i < endIdx; i++) {
       if (abortRef.current) break;
-      await sleep(Math.min(script[i].delay ?? 0, 350));
+      await sleep(Math.min(scaledDelay(script[i]), 1200));
       if (abortRef.current) break;
       await applyStep(script[i], i);
       stepIdxRef.current = i + 1;
@@ -522,6 +590,26 @@ export default function PKSFAgentDemo() {
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <select
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  disabled={running}
+                  style={{
+                    minHeight: 48,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    background: COLORS.surface,
+                    border: `1.5px solid ${COLORS.mintDim}`,
+                    color: COLORS.text,
+                    fontFamily: 'inherit',
+                    fontSize: '1em',
+                    fontWeight: 600,
+                  }}
+                >
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
+                <select
                   value={scenarioKey}
                   onChange={(e) => setScenarioKey(e.target.value)}
                   disabled={running}
@@ -536,7 +624,7 @@ export default function PKSFAgentDemo() {
                     fontSize: '1em',
                   }}
                 >
-                  {scenarioKeys.map((k) => (
+                  {(DEPARTMENTS.find((d) => d.id === department)?.scenarioKeys ?? scenarioKeys).map((k) => (
                     <option key={k} value={k}>
                       {SCENARIOS[k].label}
                     </option>
@@ -586,8 +674,8 @@ export default function PKSFAgentDemo() {
                 </label>
                 <button
                   type="button"
-                  onClick={stepMode ? runStepForward : runDemo}
-                  disabled={running && !stepMode}
+                  onClick={stepMode ? (stepCursor === 0 ? runDemo : runStepForward) : runDemo}
+                  disabled={running}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -600,20 +688,22 @@ export default function PKSFAgentDemo() {
                     border: 'none',
                     fontWeight: 700,
                     fontSize: '1.05em',
-                    cursor: running && !stepMode ? 'not-allowed' : 'pointer',
+                    cursor: running ? 'not-allowed' : 'pointer',
                     fontFamily: 'inherit',
                   }}
                 >
-                  {running && !stepMode ? (
+                  {running ? (
                     <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
                   ) : stepMode ? (
                     stepCursor === 0 ? <Play size={15} fill={COLORS.onAccent} /> : <SkipForward size={15} />
                   ) : (
                     <Play size={15} fill={COLORS.onAccent} />
                   )}
-                  {stepMode
-                    ? (stepCursor === 0 ? 'Start Freya' : t('nextStep'))
-                    : running ? t('running') : completed ? t('runAgain') : t('runDemo')
+                  {running
+                    ? t('running')
+                    : stepMode
+                      ? (stepCursor === 0 ? 'Start Freya' : t('nextStep'))
+                      : completed ? t('runAgain') : t('runDemo')
                   }
                 </button>
                 <button
@@ -715,6 +805,9 @@ export default function PKSFAgentDemo() {
               nextAgentLabel={nextAgentLabel}
               isRunning={running}
               finishedAgents={finishedAgents}
+              misPhase={misPhase}
+              misSteps={misSteps}
+              department={DEPARTMENTS.find((d) => d.id === department)}
               t={t}
             />
           </div>
@@ -757,7 +850,7 @@ export default function PKSFAgentDemo() {
                 <VerdictBlock
                   title={t('agentTitle')}
                   rows={[
-                    ['Specialists activated', `${activeAgents.length} of 9`],
+                    ['Specialists activated', `${activeAgents.length} of ${new Set(activeScenario.script.filter(s=>s.type==='agent').map(s=>s.id)).size}`],
                     ['Sub-tasks', `${totalProgress} · workflow complete`],
                     [t('toolCalls'), `${tools.length}`],
                     ['Human approval gates', '2 · escalation + external release'],
@@ -815,6 +908,15 @@ export default function PKSFAgentDemo() {
           <div>{t('footnote')}</div>
           <div className="font-mono">{t('buildId')}</div>
         </footer>
+
+        {authOpen && (
+          <AuthModal
+            department={DEPARTMENTS.find((d) => d.id === department)}
+            scenario={activeScenario}
+            phase={authPhase}
+            onSignIn={handleAuthSignIn}
+          />
+        )}
 
         {presenterOpen && (
           <div
@@ -1218,10 +1320,309 @@ function AgentGlassBoxLog({ agentRuns, activeAgents, isComplete, finishedAgents 
   );
 }
 
+function AuthModal({ department, scenario, phase, onSignIn }) {
+  const isAuthenticating = phase === 'authenticating';
+  const isDone = phase === 'done';
+
+  return createPortal(
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,19,8,0.55)', zIndex: 200, backdropFilter: 'blur(3px)' }} />
+      <div
+        className="anim-fade-scale"
+        style={{
+          position: 'fixed', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'min(460px, 94vw)',
+          background: COLORS.surface,
+          borderRadius: 14,
+          border: `1.5px solid ${COLORS.borderHi}`,
+          boxShadow: '0 24px 64px rgba(4,19,8,0.28)',
+          zIndex: 201,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{ background: '#0D2818', padding: '20px 24px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 10, background: `linear-gradient(135deg, ${COLORS.mint}, ${COLORS.teal})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Lock size={20} color="#fff" strokeWidth={2.2} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.68em', color: '#7CB898', letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 700 }}>
+              PKSF Integrated Systems — Secure Sign In
+            </div>
+            <div style={{ fontSize: '1.05em', fontWeight: 700, color: '#fff', marginTop: 3, fontFamily: "'Syne', sans-serif" }}>
+              {department?.dataSource ?? 'PKSF MIS Core'}
+            </div>
+          </div>
+        </div>
+
+        {/* Classification strip */}
+        <div style={{ background: `${COLORS.mint}18`, borderBottom: `1px solid ${COLORS.borderHi}`, padding: '6px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.68em', color: COLORS.mint, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+            Simulation — Demo Credentials
+          </span>
+          <span style={{ fontSize: '0.68em', color: COLORS.textMute }}>
+            {scenario?.region ?? ''} · {scenario?.period ?? 'Q1 2026'}
+          </span>
+        </div>
+
+        {/* Form fields */}
+        <div style={{ padding: '22px 24px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {[
+            { label: 'Username', value: department?.userEmail ?? 'user@pksf.org.bd', mono: true },
+            { label: 'Password', value: '●●●●●●●●●●', mono: false },
+            { label: 'Department', value: department?.label ?? '—', mono: false },
+            { label: 'Role', value: department?.userRole ?? '—', mono: false },
+          ].map(({ label, value, mono }) => (
+            <div key={label}>
+              <div style={{ fontSize: '0.7em', color: COLORS.textMute, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 }}>
+                {label}
+              </div>
+              <div
+                style={{
+                  padding: '9px 12px', borderRadius: 7,
+                  background: COLORS.surfaceHi,
+                  border: `1px solid ${COLORS.border}`,
+                  fontSize: mono ? '0.88em' : '0.92em',
+                  color: COLORS.text, fontWeight: 500,
+                  fontFamily: mono ? "'JetBrains Mono', monospace" : 'inherit',
+                  letterSpacing: mono ? 0.3 : 0,
+                }}
+              >
+                {value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Sign-in button */}
+        <div style={{ padding: '0 24px 24px' }}>
+          <button
+            type="button"
+            onClick={onSignIn}
+            disabled={isAuthenticating || isDone}
+            style={{
+              width: '100%', minHeight: 48, borderRadius: 9, border: 'none',
+              background: isDone ? COLORS.mint : isAuthenticating ? COLORS.surfaceHi : COLORS.mint,
+              color: isAuthenticating ? COLORS.textMute : '#fff',
+              fontSize: '1em', fontWeight: 700, cursor: isAuthenticating || isDone ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              transition: 'background 0.2s',
+            }}
+          >
+            {isDone ? (
+              <><CheckCircle2 size={17} /> Authenticated — loading systems…</>
+            ) : isAuthenticating ? (
+              <><Loader2 size={17} style={{ animation: 'spin 1s linear infinite' }} /> Authenticating…</>
+            ) : (
+              <><Lock size={16} /> Sign in to PKSF Systems</>
+            )}
+          </button>
+          <div style={{ marginTop: 10, fontSize: '0.72em', color: COLORS.textMute, textAlign: 'center', lineHeight: 1.5 }}>
+            Demo simulation only · No real credentials are transmitted
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
+function MisConnectionOverlay({ phase, steps, department, scenario }) {
+  const isReady = phase === 'ready';
+  return (
+    <div
+      className="anim-fade-up"
+      style={{
+        marginBottom: 14,
+        borderRadius: 12,
+        border: `1.5px solid ${isReady ? COLORS.mint : COLORS.borderHi}`,
+        background: isReady
+          ? `linear-gradient(135deg, #EEF7F1, #F0FAF4)`
+          : `linear-gradient(135deg, ${COLORS.surface}, ${COLORS.surfaceHi})`,
+        overflow: 'hidden',
+        transition: 'border-color 0.4s, background 0.4s',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 18px',
+          background: isReady ? `${COLORS.mint}18` : COLORS.surfaceHi,
+          borderBottom: `1px solid ${COLORS.border}`,
+        }}
+      >
+        <div
+          style={{
+            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+            background: isReady ? COLORS.mint : COLORS.surfaceHi,
+            border: `1px solid ${isReady ? COLORS.mint : COLORS.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {isReady
+            ? <CheckCircle2 size={17} color="#fff" />
+            : <Loader2 size={17} color={COLORS.mint} style={{ animation: 'spin 1.2s linear infinite' }} />
+          }
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.72em', color: COLORS.textMute, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+            {isReady ? 'Connection established' : 'Initialising data connection'}
+          </div>
+          <div style={{ fontSize: '0.95em', fontWeight: 700, color: COLORS.text, marginTop: 2 }}>
+            {department?.dataSource ?? 'PKSF MIS Core'}
+          </div>
+        </div>
+        <div
+          style={{
+            fontSize: '0.78em', fontWeight: 600, padding: '4px 10px', borderRadius: 20,
+            background: isReady ? COLORS.mint : `${COLORS.amber}22`,
+            color: isReady ? '#fff' : COLORS.amber,
+          }}
+        >
+          {isReady ? 'Ready' : 'Connecting…'}
+        </div>
+      </div>
+
+      {/* Meta row */}
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+          borderBottom: `1px solid ${COLORS.border}`,
+        }}
+      >
+        {[
+          ['User Role', department?.userRole ?? '—'],
+          ['Region', scenario?.region ?? '—'],
+          ['Period', scenario?.period ?? 'Q1 2026'],
+        ].map(([label, value], i) => (
+          <div
+            key={i}
+            style={{
+              padding: '8px 14px',
+              borderRight: i < 2 ? `1px solid ${COLORS.border}` : 'none',
+            }}
+          >
+            <div style={{ fontSize: '0.62em', color: COLORS.textMute, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>
+              {label}
+            </div>
+            <div style={{ fontSize: '0.85em', color: COLORS.text, fontWeight: 600 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Steps */}
+      <div style={{ padding: '10px 18px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {steps.map((step, i) => (
+          <div
+            key={i}
+            className="anim-fade-up"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85em', color: COLORS.textDim }}
+          >
+            <CheckCircle2 size={13} color={COLORS.mint} style={{ flexShrink: 0 }} />
+            <span>{step}</span>
+          </div>
+        ))}
+        {!isReady && steps.length < (department?.misSteps?.length ?? 5) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85em', color: COLORS.textMute, opacity: 0.6 }}>
+            <Loader2 size={12} color={COLORS.textMute} style={{ animation: 'spin 1.2s linear infinite', flexShrink: 0 }} />
+            <span>Establishing secure session…</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const AGENT_SPOTLIGHT_ACTIONS = {
+  a1: [
+    'Parsing programme manager request…',
+    'Routing sub-tasks to specialist agents…',
+    'Coordinating parallel workflow execution…',
+    'Synthesising findings from all specialists…',
+    'Validating agent outputs against criteria…',
+  ],
+  a2: [
+    'Accessing monitoring & evaluation database…',
+    'Aggregating quarterly KPI indicators…',
+    'Comparing POs against regional benchmark…',
+    'Calculating M&E composite scores…',
+    'Structuring performance report sections…',
+  ],
+  a3: [
+    'Querying partner organisation metrics…',
+    'Calculating repayment rate deviations…',
+    'Flagging underperforming POs…',
+    'Cross-checking against historical trends…',
+    'Computing deviation from regional baseline…',
+  ],
+  a4: [
+    'Accessing field officer visit reports…',
+    'Synthesising ground-level observations…',
+    'Correlating environmental disruption factors…',
+    'Mapping geographic data points…',
+    'Reconciling field data with MIS records…',
+  ],
+  a5: [
+    'Querying beneficiary income records…',
+    'Calculating household-level impact scores…',
+    'Tracking active borrower programme reach…',
+    'Analysing repayment capacity trends…',
+    'Aggregating livelihood outcome indicators…',
+  ],
+  a6: [
+    'Scanning portfolio health indicators…',
+    'Calculating PAR-30 exposure ratios…',
+    'Identifying regional concentration risks…',
+    'Running portfolio stress-test scenarios…',
+    'Flagging overdue tranche windows…',
+  ],
+  a7: [
+    'Structuring memo sections from agent outputs…',
+    'Pulling data citations from specialist findings…',
+    'Drafting executive narrative summary…',
+    'Applying PKSF document formatting standards…',
+    'Inserting human-approval gate references…',
+  ],
+  a8: [
+    'Scanning disbursement ledger entries…',
+    'Applying tranche compliance rule engine…',
+    'Calculating anomaly severity scores…',
+    'Flagging timing violations for review…',
+    'Cross-referencing approved tranche calendar…',
+  ],
+  a9: [
+    'Loading historical programme performance data…',
+    'Running Q2 scenario projection models…',
+    'Calculating portfolio recovery trajectories…',
+    'Estimating repayment normalisation timelines…',
+    'Generating forward outlook estimates…',
+  ],
+};
+
 function ActiveAgentSpotlight({ activeAgents, tools, reasoning, t }) {
   const agentById = useMemo(() => Object.fromEntries(AGENTS.map((a) => [a.id, a])), []);
   const currentId = activeAgents[activeAgents.length - 1];
   const currentAgent = agentById[currentId];
+
+  const [actionIdx, setActionIdx] = useState(0);
+  const [actionKey, setActionKey] = useState(0);
+
+  useEffect(() => {
+    setActionIdx(0);
+    setActionKey((k) => k + 1);
+  }, [currentId]);
+
+  useEffect(() => {
+    const actions = AGENT_SPOTLIGHT_ACTIONS[currentId];
+    if (!actions || actions.length <= 1) return;
+    const timer = setInterval(() => {
+      setActionIdx((prev) => (prev + 1) % actions.length);
+      setActionKey((k) => k + 1);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, [currentId]);
 
   if (!currentAgent) {
     return (
@@ -1244,10 +1645,8 @@ function ActiveAgentSpotlight({ activeAgents, tools, reasoning, t }) {
   }
 
   const Icon = currentAgent.icon;
-  const lastTool = [...tools].reverse().find((x) => x.agentId === currentId);
-  const lastReason = reasoning[reasoning.length - 1];
-  const currentAction = lastTool?.label ?? (lastReason?.text ? lastReason.text.slice(0, 130) + (lastReason.text.length > 130 ? '…' : '') : null);
-  const actionIsToolCall = Boolean(lastTool);
+  const agentActions = AGENT_SPOTLIGHT_ACTIONS[currentId] ?? [];
+  const currentAction = agentActions[actionIdx] ?? null;
 
   return (
     <div
@@ -1291,26 +1690,23 @@ function ActiveAgentSpotlight({ activeAgents, tools, reasoning, t }) {
         <div style={{ fontSize: '0.92em', color: COLORS.textDim, marginTop: 3 }}>{currentAgent.role}</div>
         {currentAction && (
           <div
+            key={actionKey}
             className="anim-fade-up"
             style={{
               marginTop: 10,
               padding: '8px 14px',
               borderRadius: 8,
-              background: COLORS.surfaceHi,
-              border: `1px solid ${COLORS.border}`,
+              background: 'rgb(233, 242, 236)',
+              border: '1px solid rgb(201, 221, 210)',
               fontSize: '0.92em',
-              color: COLORS.text,
+              color: 'rgb(18, 38, 28)',
               lineHeight: 1.5,
               display: 'flex',
               alignItems: 'flex-start',
               gap: 8,
             }}
           >
-            {actionIsToolCall ? (
-              <Zap size={14} color={COLORS.amber} style={{ flexShrink: 0, marginTop: 3 }} />
-            ) : (
-              <ChevronRight size={14} color={COLORS.mint} style={{ flexShrink: 0, marginTop: 3 }} />
-            )}
+            <Loader2 size={13} color={COLORS.mint} style={{ flexShrink: 0, marginTop: 3, animation: 'spin 1.2s linear infinite' }} />
             <span>{currentAction}</span>
           </div>
         )}
@@ -1426,18 +1822,23 @@ function TaskStepper({ tasks, taskState, decompositionHint, t }) {
   );
 }
 
-function AgentPipeline({ activeAgents, t }) {
+function AgentPipeline({ activeAgents, scenarioAgentIds = [], t }) {
   const agentById = useMemo(() => Object.fromEntries(AGENTS.map((a) => [a.id, a])), []);
   const activatedInOrder = activeAgents.map((id) => agentById[id]).filter(Boolean);
-  const notActivated = AGENTS.filter((a) => !activeAgents.includes(a.id));
+  // Only show standby agents that are actually used in this scenario
+  const notActivated = scenarioAgentIds
+    .filter((id) => !activeAgents.includes(id))
+    .map((id) => agentById[id])
+    .filter(Boolean);
   const currentId = activeAgents[activeAgents.length - 1];
+  const total = scenarioAgentIds.length || AGENTS.length;
 
   return (
     <div style={{ padding: '14px 16px', background: COLORS.surfaceHi, border: `1px solid ${COLORS.border}`, borderRadius: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <Layers size={16} color={COLORS.teal} />
         <span style={{ fontSize: '0.95em', color: COLORS.teal, fontWeight: 700 }}>{t('agentActivations')}</span>
-        <span style={{ fontSize: '0.82em', color: COLORS.textDim, marginLeft: 'auto' }}>{activeAgents.length}/9</span>
+        <span style={{ fontSize: '0.82em', color: COLORS.textDim, marginLeft: 'auto' }}>{activeAgents.length}/{total}</span>
       </div>
 
       {activatedInOrder.length === 0 ? (
@@ -1550,11 +1951,27 @@ function AgentPanel({
   nextAgentLabel,
   isRunning,
   finishedAgents,
+  misPhase,
+  misSteps,
+  department,
   t,
 }) {
   const [openSource, setOpenSource] = useState(null);
   const [showFinalReport, setShowFinalReport] = useState(false);
   const humanGateRef = useRef(null);
+
+  // Derive which agents this scenario actually uses (ordered by first appearance)
+  const scenarioAgentIds = useMemo(() => {
+    const seen = new Set();
+    const ordered = [];
+    for (const step of scenario.script ?? []) {
+      if (step.type === 'agent' && !seen.has(step.id)) {
+        seen.add(step.id);
+        ordered.push(step.id);
+      }
+    }
+    return ordered;
+  }, [scenario]);
 
   useEffect(() => {
     if (reasoning.length === 0) setOpenSource(null);
@@ -1622,6 +2039,10 @@ function AgentPanel({
         </div>
       </div>
 
+      {misPhase !== 'idle' && (
+        <MisConnectionOverlay phase={misPhase} steps={misSteps} department={department} scenario={scenario} />
+      )}
+
       <ActiveAgentSpotlight activeAgents={activeAgents} tools={tools} reasoning={reasoning} t={t} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 14 }}>
@@ -1630,7 +2051,7 @@ function AgentPanel({
           <ToolStream tools={tools} t={t} />
         </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <AgentPipeline activeAgents={activeAgents} t={t} />
+            <AgentPipeline activeAgents={activeAgents} scenarioAgentIds={scenarioAgentIds} t={t} />
             <ReasoningStream
               reasoning={reasoning}
               endRef={reasoningEndRef}
@@ -1831,7 +2252,12 @@ function DecompositionTree({ tasks, taskState, decompositionHint, t }) {
   );
 }
 
-function AgentRoster({ activeAgents, t }) {
+function AgentRoster({ activeAgents, scenarioAgentIds = [], t }) {
+  const scenarioAgents = scenarioAgentIds.length > 0
+    ? AGENTS.filter((a) => scenarioAgentIds.includes(a.id))
+    : AGENTS;
+  const total = scenarioAgents.length;
+
   return (
     <div style={{ padding: 14, background: COLORS.surfaceHi, border: `1px solid ${COLORS.border}`, borderRadius: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -1840,11 +2266,11 @@ function AgentRoster({ activeAgents, t }) {
           {t('agentActivations')}
         </span>
         <span style={{ fontSize: '0.8em', color: COLORS.textDim, marginLeft: 'auto' }}>
-          {activeAgents.length}/9
+          {activeAgents.length}/{total}
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-        {AGENTS.map((agent) => {
+        {scenarioAgents.map((agent) => {
           const Icon = agent.icon;
           const idx = activeAgents.indexOf(agent.id);
           const active = idx !== -1;

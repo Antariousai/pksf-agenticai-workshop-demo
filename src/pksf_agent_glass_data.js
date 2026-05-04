@@ -578,3 +578,294 @@ Compile confidential RJH-Q1 compliance bulletin with ledger row IDs + rule citat
     },
   },
 };
+
+// ─── M&E Department — Dhaka Q1 2026 ──────────────────────────────────────────
+export const ME_AGENT_GLASS = {
+  a1: {
+    freyaPrompt: `Programme Intelligence (Freya) · M&E routing\nDigest intent: Q1 2026 Dhaka M&E indicator review. Pull PDO compliance data, beneficiary outreach figures, cross-check against PKSF log frames. Deliverable: donor-ready M&E snapshot.`,
+    reasoning: `Intent class = M&E snapshot (not performance memo). Route to a2 as primary. Cross-check with a5 for beneficiary reach. Field narrative from a4 if indicators are off-track. Draft donor update via a7.`,
+    calculations: [
+      { label: 'Intent slots filled', expression: 'filled / total', value: '5 / 5' },
+      { label: 'Agents in M&E chain', expression: 'primary path', value: '5' },
+      { label: 'Donor-facing gates', expression: 'memo release', value: '1' },
+    ],
+    output: 'Task graph: a2 → a3 → a5 → a4 → a7 → (memo gate) → artefact.',
+    outputData: {
+      reportTitle: 'M&E Workflow Plan — Dhaka Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Intent slots filled', value: '5 / 5', sub: 'All confirmed', color: 'mint' },
+          { label: 'M&E agents activated', value: '5', sub: 'Sequential chain', color: 'teal' },
+          { label: 'Approval gates', value: '1', sub: 'Donor release gate', color: 'amber' },
+        ]},
+        { type: 'text', content: 'Scope: Dhaka division · Q1 2026 · M&E indicators review → donor-ready snapshot.', variant: 'callout' },
+        { type: 'flow', steps: [
+          { label: 'Agent 02', sub: 'M&E Indicators', color: 'mint' },
+          { label: 'Agent 03', sub: 'PO Reporting', color: 'mint' },
+          { label: 'Agent 05', sub: 'Beneficiary', color: 'mint' },
+          { label: 'Agent 04', sub: 'Field Data', color: 'teal' },
+          { label: 'Agent 07', sub: 'Donor Report', color: 'teal' },
+          { label: 'Human Gate', sub: 'Release', color: 'amber' },
+          { label: 'Artefact', sub: 'Released', color: 'mint' },
+        ]},
+      ],
+    },
+  },
+  a2: {
+    freyaPrompt: `M&E Report Generator — pull Q1 2026 PDO indicators for Dhaka division. Flag any indicator deviating >10% from log frame targets.`,
+    reasoning: `Pulling indicator matrix from MIS. Comparing actuals vs log frame targets. 3 of 12 indicators deviate beyond threshold.`,
+    calculations: [
+      { label: 'Indicators assessed', expression: 'total log frame', value: '12' },
+      { label: 'On-track (deviation ≤10%)', expression: 'compliant', value: '9' },
+      { label: 'Flagged (deviation >10%)', expression: 'threshold breach', value: '3' },
+    ],
+    output: 'Q1 M&E matrix — 3 indicators flagged: Beneficiary reach (−12%), Disbursement utilisation (−11%), Income growth proxy (+14% ahead).',
+    outputData: {
+      reportTitle: 'M&E Indicator Matrix — Dhaka Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Indicators on-track', value: '9 / 12', sub: '75% compliance', color: 'mint' },
+          { label: 'Below target', value: '2', sub: 'Need attention', color: 'amber' },
+          { label: 'Above target', value: '1', sub: 'Ahead of plan', color: 'teal' },
+        ]},
+        { type: 'table', headers: ['Indicator', 'Target', 'Actual', 'Status'],
+          rows: [
+            ['Beneficiary reach', '8,500', '7,480', 'Below'],
+            ['Disbursement utilisation', '92%', '81%', 'Below'],
+            ['Income growth proxy', '8%', '9.1%', 'Ahead'],
+            ['Repayment rate', '80%', '78.9%', 'On track'],
+            ['Field visit coverage', '85%', '83.2%', 'On track'],
+          ],
+        },
+      ],
+    },
+  },
+  a3: {
+    freyaPrompt: `PO Performance Monitor — check PO M&E reporting compliance for Dhaka Q1 2026. Flag POs that missed reporting deadlines.`,
+    reasoning: `Checking submission timestamps vs required schedule. 2 of 14 POs submitted late.`,
+    calculations: [
+      { label: 'POs in Dhaka division', expression: 'active roster', value: '14' },
+      { label: 'On-time submissions', expression: 'deadline met', value: '12' },
+      { label: 'Late submissions', expression: 'deadline missed', value: '2' },
+    ],
+    output: 'PO-DHK-06 and PO-DHK-11 submitted Q1 M&E reports 8 and 13 days late respectively.',
+    outputData: {
+      reportTitle: 'PO M&E Reporting Compliance — Dhaka Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'POs in scope', value: '14', sub: 'Dhaka active', color: 'teal' },
+          { label: 'On-time', value: '12', sub: 'Compliant', color: 'mint' },
+          { label: 'Late', value: '2', sub: 'Flag for follow-up', color: 'amber' },
+        ]},
+        { type: 'table', headers: ['PO', 'Deadline', 'Submitted', 'Days Late'],
+          rows: [
+            ['PO-DHK-06', '2026-04-07', '2026-04-15', '+8 days'],
+            ['PO-DHK-11', '2026-04-07', '2026-04-20', '+13 days'],
+          ],
+        },
+      ],
+    },
+  },
+  a5: {
+    freyaPrompt: `Beneficiary Analytics — pull beneficiary reach figures for Dhaka Q1 2026. Segment by gender and loan cohort.`,
+    reasoning: `Aggregating beneficiary data from MIS. Actual reach 7,480 vs 8,500 target — 88% achievement. Gender split healthy.`,
+    calculations: [
+      { label: 'Total beneficiaries reached', expression: 'MIS count', value: '7,480' },
+      { label: 'Female beneficiaries', expression: 'gender ratio', value: '74.2%' },
+      { label: 'New borrowers', expression: 'first loan cohort', value: '1,240' },
+    ],
+    output: 'Beneficiary reach: 7,480 (88% of Q1 target). Female participation: 74.2%. New borrower pipeline: 1,240.',
+    outputData: {
+      reportTitle: 'Beneficiary Analytics — Dhaka Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Total beneficiaries', value: '7,480', sub: '88% of target', color: 'teal' },
+          { label: 'Female participation', value: '74.2%', sub: 'Above 70% threshold', color: 'mint' },
+          { label: 'New borrowers', value: '1,240', sub: 'Strong pipeline', color: 'mint' },
+        ]},
+      ],
+    },
+  },
+  a4: {
+    freyaPrompt: `Field Data Analyst — check field officer visit data for Dhaka Q1. Explain lower-than-expected beneficiary reach in 2 sub-districts.`,
+    reasoning: `Field reports show 2 sub-districts with reduced coverage due to planned staff transitions in February 2026.`,
+    calculations: [
+      { label: 'Sub-districts below target', expression: 'coverage gap', value: '2 of 18' },
+      { label: 'Visits missed (estimated)', expression: 'transition gap', value: '~120' },
+    ],
+    output: 'Bijoynagar and Savar under-reached. Root cause: staff transitions in Feb 2026. Recovery expected Q2.',
+    outputData: {
+      reportTitle: 'Field Coverage Analysis — Dhaka Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Under-reached sub-districts', value: '2', sub: 'Staff transition gap', color: 'amber' },
+          { label: 'Estimated visits missed', value: '~120', sub: 'Feb 2026', color: 'amber' },
+          { label: 'Recovery timeline', value: 'Q2 2026', sub: 'Staff now placed', color: 'mint' },
+        ]},
+        { type: 'text', content: 'Bijoynagar and Savar sub-districts experienced reduced field coverage in February 2026 due to planned officer transitions. Replacements are now in post. Q2 recovery projected.', variant: 'callout' },
+      ],
+    },
+  },
+  a7: {
+    freyaPrompt: `Document Drafting — compile Q1 2026 M&E donor update for Dhaka. Include indicator matrix, beneficiary reach data, and field narrative for 2 under-reached sub-districts.`,
+    reasoning: `Structuring 4-section donor update. All data cited from agent outputs. Reach shortfall is operational (staff transition), not systemic.`,
+    calculations: [
+      { label: 'Sections', expression: 'structure', value: '4' },
+      { label: 'Indicator citations', expression: 'data points', value: '12' },
+      { label: 'Narrative flags addressed', expression: 'explained items', value: '3' },
+    ],
+    output: 'PKSF_Dhaka_Q1-2026_Donor_ME_Update.pdf — donor-ready draft, 2 pages.',
+    outputData: {
+      reportTitle: 'M&E Donor Update — Dhaka Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Report pages', value: '2', sub: 'Donor format', color: 'teal' },
+          { label: 'Indicators covered', value: '12', sub: 'Full matrix', color: 'mint' },
+          { label: 'Flags addressed', value: '3', sub: 'With explanations', color: 'mint' },
+        ]},
+        { type: 'text', content: 'Donor update compiled. 3 flagged indicators explained: reach shortfall attributed to operational staffing gap (resolved); disbursement utilisation due to Q4 carry-forward reallocation; income proxy above target noted as positive.', variant: 'callout' },
+      ],
+    },
+  },
+};
+
+// ─── Field Operations Department — Sylhet Q1 2026 ────────────────────────────
+export const FIELD_AGENT_GLASS = {
+  a1: {
+    freyaPrompt: `Programme Intelligence (Freya) · Field Operations routing\nIntent: Synthesise Q1 2026 field officer data for Sylhet division. Identify service delivery gaps. Produce programme note with recommendations.`,
+    reasoning: `Intent class = field synthesis note. Route to a4 as primary. Cross-check with a5 for beneficiary exposure. PO coordination check via a3. Programme note via a7, Q2 outlook via a9.`,
+    calculations: [
+      { label: 'Intent slots filled', expression: 'filled / total', value: '4 / 4' },
+      { label: 'Field agents in chain', expression: 'primary path', value: '5' },
+      { label: 'Approval gates', expression: 'programme note release', value: '1' },
+    ],
+    output: 'Task graph: a4 → a5 → a3 → a7 → (memo gate) → a9 → artefact.',
+    outputData: {
+      reportTitle: 'Field Ops Workflow Plan — Sylhet Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Intent slots filled', value: '4 / 4', sub: 'All confirmed', color: 'mint' },
+          { label: 'Agents activated', value: '5', sub: 'Field-led chain', color: 'teal' },
+          { label: 'Approval gates', value: '1', sub: 'Programme note', color: 'amber' },
+        ]},
+        { type: 'flow', steps: [
+          { label: 'Agent 04', sub: 'Field Data', color: 'mint' },
+          { label: 'Agent 05', sub: 'Beneficiary', color: 'mint' },
+          { label: 'Agent 03', sub: 'PO Coordination', color: 'teal' },
+          { label: 'Agent 07', sub: 'Programme Note', color: 'teal' },
+          { label: 'Human Gate', sub: 'Release', color: 'amber' },
+          { label: 'Agent 09', sub: 'Forecast', color: 'teal' },
+          { label: 'Artefact', sub: 'Released', color: 'mint' },
+        ]},
+      ],
+    },
+  },
+  a4: {
+    freyaPrompt: `Field Data Analyst — pull all Q1 2026 field officer visit data for Sylhet division. Identify sub-districts with below-target visit frequency and recurring service issues.`,
+    reasoning: `Loaded 847 field visit records for Sylhet Q1. Computing visit frequency per sub-district. 4 of 22 sub-districts below 80% visit target.`,
+    calculations: [
+      { label: 'Total visit records', expression: 'Sylhet Q1', value: '847' },
+      { label: 'Sub-districts assessed', expression: 'Sylhet total', value: '22' },
+      { label: 'Below visit target (80%)', expression: 'coverage gap', value: '4' },
+    ],
+    output: 'Sylhet: 4 sub-districts below 80% visit target. Recurring issue: transport constraints in Jaintiapur and Gowainghat.',
+    outputData: {
+      reportTitle: 'Field Visit Analysis — Sylhet Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Visit records processed', value: '847', sub: 'Sylhet Q1', color: 'teal' },
+          { label: 'Sub-districts at risk', value: '4', sub: 'Below 80% target', color: 'amber' },
+          { label: 'Top issue', value: 'Transport', sub: 'Jaintiapur · Gowainghat', color: 'amber' },
+        ]},
+        { type: 'table', headers: ['Sub-district', 'Target visits', 'Actual', 'Coverage'],
+          rows: [
+            ['Jaintiapur', '45', '31', '68.9%'],
+            ['Gowainghat', '38', '27', '71.1%'],
+            ['Bishwanath', '52', '40', '76.9%'],
+            ['Zakiganj', '41', '31', '75.6%'],
+          ],
+        },
+      ],
+    },
+  },
+  a5: {
+    freyaPrompt: `Beneficiary Analytics — cross-reference Sylhet field coverage gaps with borrower contact data. Identify borrowers potentially under-served.`,
+    reasoning: `Linking visit-gap sub-districts to beneficiary roster. ~580 borrowers in gap zones had fewer than 2 officer contacts in Q1.`,
+    calculations: [
+      { label: 'Borrowers in gap sub-districts', expression: 'roster overlap', value: '1,340' },
+      { label: 'Under-contacted (contacts < 2)', expression: 'risk flag', value: '580' },
+      { label: 'Arrears correlation', expression: 'low-contact vs avg', value: '+2.1σ' },
+    ],
+    output: '580 of 1,340 borrowers in gap zones had fewer than 2 contacts in Q1 2026. Arrears correlation: +2.1σ above mean.',
+    outputData: {
+      reportTitle: 'Beneficiary Contact Gap — Sylhet Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Under-contacted borrowers', value: '580', sub: 'Gap zone risk', color: 'amber' },
+          { label: 'Arrears correlation', value: '+2.1σ', sub: 'Low-contact vs avg', color: 'amber' },
+          { label: 'Recoverable with visit boost', value: '~420', sub: 'Model estimate', color: 'mint' },
+        ]},
+      ],
+    },
+  },
+  a3: {
+    freyaPrompt: `PO Performance Monitor — check PO coordination response for Sylhet transport constraint issue. Have POs flagged this in their own reports?`,
+    reasoning: `Scanning Q1 narrative submissions for Sylhet POs. 2 of 3 POs covering gap sub-districts flagged transport costs.`,
+    calculations: [
+      { label: 'POs covering gap zones', expression: 'roster map', value: '3' },
+      { label: 'POs flagging transport', expression: 'narrative scan', value: '2' },
+    ],
+    output: 'PO-SYL-04 and PO-SYL-07 both flagged transport costs as an operational constraint in their Q1 submissions.',
+    outputData: {
+      reportTitle: 'PO Coordination Check — Sylhet Gap Zones',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'POs in gap zones', value: '3', sub: 'Sylhet coverage', color: 'teal' },
+          { label: 'Self-flagged transport issue', value: '2', sub: 'Pre-identified by POs', color: 'amber' },
+        ]},
+        { type: 'text', content: 'PO-SYL-04 and PO-SYL-07 have already raised transport cost constraints in their Q1 narrative reports. Recommendation should acknowledge PO-level awareness and request a costed mitigation plan.', variant: 'callout' },
+      ],
+    },
+  },
+  a7: {
+    freyaPrompt: `Document Drafting — produce a programme note for Sylhet Q1 2026. Summarise field visit gaps, beneficiary contact risk, and PO transport issue. Include recommendations.`,
+    reasoning: `Drafting 3-section programme note with data citations from a4, a5, a3 outputs.`,
+    calculations: [
+      { label: 'Sections', expression: 'structure', value: '3' },
+      { label: 'Data citations', expression: 'from agents', value: '8' },
+      { label: 'Recommendations', expression: 'actionable', value: '3' },
+    ],
+    output: 'PKSF_Sylhet_Q1-2026_Field_Programme_Note.pdf — internal draft ready.',
+    outputData: {
+      reportTitle: 'Field Programme Note — Sylhet Q1 2026',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Report pages', value: '2', sub: 'Programme note format', color: 'teal' },
+          { label: 'Data citations', value: '8', sub: 'Agent-sourced', color: 'mint' },
+          { label: 'Recommendations', value: '3', sub: 'Actionable', color: 'mint' },
+        ]},
+        { type: 'text', content: 'Recommendations: (1) Approve transport allowance uplift for Jaintiapur and Gowainghat officers. (2) Request costed mitigation plan from PO-SYL-04 and PO-SYL-07. (3) Prioritise follow-up visits to 580 under-contacted borrowers in Q2.', variant: 'callout' },
+      ],
+    },
+  },
+  a9: {
+    freyaPrompt: `Programme Forecasting — project Q2 beneficiary contact recovery path for Sylhet if transport recommendation is approved.`,
+    reasoning: `Model projects 89% visit target achievable by end Q2 if transport uplift approved. Under-contacted pool falls from 580 to ~180.`,
+    calculations: [
+      { label: 'Q2 visit target achievability', expression: 'with transport fix', value: '89%' },
+      { label: 'Under-contacted reduction', expression: 'projected Q2', value: '580 → ~180' },
+      { label: 'PAR risk if delayed', expression: 'stress scenario', value: '+0.8% PAR' },
+    ],
+    output: 'Q2 outlook: transport uplift resolves ~70% of contact gap by Q2 end. PAR risk contained if implemented by May 2026.',
+    outputData: {
+      reportTitle: 'Q2 Outlook — Sylhet Field Recovery',
+      sections: [
+        { type: 'metrics', items: [
+          { label: 'Q2 visit target (with fix)', value: '89%', sub: 'Achievable', color: 'mint' },
+          { label: 'Under-contacted reduction', value: '580 → 180', sub: 'Projected Q2', color: 'mint' },
+          { label: 'PAR risk if delayed', value: '+0.8% PAR', sub: 'Stress scenario', color: 'amber' },
+        ]},
+      ],
+    },
+  },
+};
