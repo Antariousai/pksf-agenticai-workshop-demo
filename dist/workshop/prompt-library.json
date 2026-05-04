@@ -1,0 +1,77 @@
+{
+  "version": "2026-04",
+  "description": "Hands-on prompt cards for Antarious AI · PKSF workshop. Pair with facilitator FAQ.",
+  "difficulty": {
+    "easy": "Follow exactly—timboxed confidence builder.",
+    "medium": "Change one variable (region, quarter, PO code)."
+  },
+  "by_agent": {
+    "programme_intelligence": {
+      "label": "01 · Programme Intelligence",
+      "easy": "Summarise partner organisation activity in Khulna region for Q1 2026. Which three KPIs should leadership watch first?",
+      "medium": "Compare Khulna vs Rajshahi on PDO disbursement pace for Q1 2026. Flag any PO more than one standard deviation below its regional mean."
+    },
+    "me_report": {
+      "label": "02 · M&E Report Generator",
+      "easy": "Draft the quarterly PDO progress narrative for Q1 2026 using approved indicators. Keep tone suitable for an internal management memo.",
+      "medium": "Generate the M&E section for Q1 2026 but emphasise environmental shocks (flooding) where field notes mention income disruption."
+    },
+    "po_performance": {
+      "label": "03 · PO Performance Monitor",
+      "easy": "List partner organisations in Khulna with repayment performance below the regional baseline for Q1 2026.",
+      "medium": "For PO-KHL-04, summarise trend vs prior quarter and list top two risk drivers from available data."
+    },
+    "field_data": {
+      "label": "04 · Field Data Analyst",
+      "easy": "Pull themes from recent field officer logs for flagged POs in Khulna.",
+      "medium": "Cross-reference field narratives with portfolio stress scores for the same POs."
+    },
+    "beneficiary_analytics": {
+      "label": "05 · Beneficiary Analytics",
+      "easy": "Describe beneficiary outreach coverage for Q1 2026 in the selected region.",
+      "medium": "Identify borrower cohorts with temporary income disruption mentioned in field data."
+    },
+    "loan_portfolio": {
+      "label": "06 · Loan Portfolio Monitor",
+      "easy": "Show PAR-30 and on-time repayment vs regional baseline for Khulna Q1 2026.",
+      "medium": "Flag portfolios with combined PAR-30 above 6% and declining recovery over two quarters."
+    },
+    "document_drafting": {
+      "label": "07 · Document Drafting",
+      "easy": "Draft a one-page talking brief for leadership on Khulna Q1 highlights and two risks.",
+      "medium": "Produce a board-style briefing with sections: Executive summary, Findings, Root causes, Recommendations."
+    },
+    "compliance": {
+      "label": "08 · Compliance & Risk Sentinel",
+      "easy": "List any compliance flags raised on tranche disbursements for Khulna POs in Q1 2026.",
+      "medium": "Explain why confidence 0.62 on a disbursement flag would escalate to a human rather than auto-resolve."
+    },
+    "forecasting": {
+      "label": "09 · Programme Forecasting",
+      "easy": "Give a baseline outlook for Khulna repayments in Q2 assuming no new shocks.",
+      "medium": "Model a stress scenario: repeat flooding — outline impact on portfolio KPIs you would monitor."
+    }
+  },
+  "by_role": {
+    "me": {
+      "label": "M&E / PDO leads",
+      "challenge_prompt": "Generate one quarterly narrative paragraph you could actually paste into a donor report after human edit.",
+      "free_exploration": "M&E Report Generator + Beneficiary Analytics"
+    },
+    "po_oversight": {
+      "label": "PO oversight",
+      "challenge_prompt": "Name one lagging PO and the evidence chain from data → field note → recommended action.",
+      "free_exploration": "PO Performance Monitor + Field Data Analyst"
+    },
+    "compliance": {
+      "label": "Compliance / risk",
+      "challenge_prompt": "Walk through one escalation: what the agent found, confidence score, and what a human must verify.",
+      "free_exploration": "Compliance Sentinel + Loan Portfolio Monitor"
+    },
+    "leadership": {
+      "label": "Leadership / donor comms",
+      "challenge_prompt": "Produce a one-page brief that balances operational truth with appropriate tone for board or donor audience.",
+      "free_exploration": "Programme Intelligence + Document Drafting + Forecasting"
+    }
+  }
+}

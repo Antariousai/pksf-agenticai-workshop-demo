@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PKSF Workshop · Session feedback</title>
+  <style>
+    :root { --bg: #f2f7f4; --card: #ffffff; --border: #c9ddd2; --mint: #169454; --text: #12261c; --dim: #425a4e; color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; line-height: 1.5; max-width: 640px; margin-inline: auto; }
+    h1 { font-size: 1.25rem; }
+    p.intro { color: var(--dim); font-size: 0.95rem; }
+    label { display: block; margin-top: 14px; font-weight: 600; font-size: 0.9rem; }
+    input[type="text"], textarea, select {
+      width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--card); color: var(--text); font-family: inherit;
+    }
+    textarea { min-height: 88px; resize: vertical; }
+    fieldset { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 18px; }
+    legend { padding: 0 8px; color: var(--mint); font-size: 0.85rem; }
+    .scale { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .scale label { font-weight: 400; display: flex; align-items: center; gap: 6px; margin: 0; }
+    button {
+      margin-top: 20px; padding: 12px 20px; border-radius: 8px; border: none;
+      background: var(--mint); color: #041308; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    #out { margin-top: 20px; padding: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; white-space: pre-wrap; display: none; }
+    .hint { font-size: 0.8rem; color: var(--dim); margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Workshop feedback · mapped to learning outcomes</h1>
+  <p class="intro">Submit copies responses below for records, or use “Export summary” for a text block to paste into email or spreadsheet.</p>
+
+  <form id="f">
+    <label>Role / unit <input name="role" type="text" autocomplete="organization-title" placeholder="e.g. M&E, PO oversight" /></label>
+    <label>Session date <input name="date" type="text" placeholder="YYYY-MM-DD" /></label>
+
+    <fieldset>
+      <legend>Outcome · Agentic vs chatbot</legend>
+      <p class="hint">I can explain how agentic AI differs from a plain chatbot for PKSF work.</p>
+      <div class="scale">
+        <label><input type="radio" name="o1" value="1" /> 1</label>
+        <label><input type="radio" name="o1" value="2" /> 2</label>
+        <label><input type="radio" name="o1" value="3" /> 3</label>
+        <label><input type="radio" name="o1" value="4" /> 4</label>
+        <label><input type="radio" name="o1" value="5" /> 5</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Outcome · Human-in-the-loop</legend>
+      <p class="hint">I understand when the system escalates to a human and why confidence scores matter.</p>
+      <div class="scale">
+        <label><input type="radio" name="o2" value="1" /> 1</label>
+        <label><input type="radio" name="o2" value="2" /> 2</label>
+        <label><input type="radio" name="o2" value="3" /> 3</label>
+        <label><input type="radio" name="o2" value="4" /> 4</label>
+        <label><input type="radio" name="o2" value="5" /> 5</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Outcome · Hands-on path</legend>
+      <p class="hint">I completed or attempted the approval / review flow (edit → approve / acknowledge).</p>
+      <select name="o3">
+        <option value="">—</option>
+        <option value="yes">Yes</option>
+        <option value="partial">Partially</option>
+        <option value="no">No</option>
+      </select>
+    </fieldset>
+
+    <label>Most useful discovery today
+      <textarea name="discovery" placeholder="One concrete thing you will try or share with your team"></textarea>
+    </label>
+
+    <label>First task I would attempt on Antarious next week (one sentence)
+      <textarea name="next_step"></textarea>
+    </label>
+
+    <label>Questions or risks for leadership / IT
+      <textarea name="questions"></textarea>
+    </label>
+
+    <button type="submit">Export summary</button>
+  </form>
+  <div id="out"></div>
+
+  <script>
+    document.getElementById('f').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const lines = [];
+      for (const [k, v] of fd.entries()) lines.push(k + ': ' + v);
+      const text = lines.join('\n');
+      const el = document.getElementById('out');
+      el.style.display = 'block';
+      el.textContent = text;
+      try {
+        navigator.clipboard.writeText(text);
+      } catch (_) {}
+    });
+  </script>
+</body>
+</html>
