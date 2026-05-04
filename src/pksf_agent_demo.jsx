@@ -638,6 +638,8 @@ export default function PKSFAgentDemo() {
               onMemoApprove={approveMemoGate}
               scenario={activeScenario}
               isComplete={showArtifact}
+              stepMode={stepMode}
+              onNextStep={runStepForward}
               t={t}
             />
           </div>
@@ -694,25 +696,50 @@ export default function PKSFAgentDemo() {
 
           {showArtifact && <MemoArtifact variant={activeScenario.memoVariant} />}
 
-          <footer
+          <div
+            role="note"
             style={{
-              marginTop: 36,
-              paddingTop: 18,
-              borderTop: `1px solid ${COLORS.border}`,
+              marginTop: 28,
+              padding: '12px 18px',
+              borderRadius: 8,
+              background: 'rgba(245, 192, 74, 0.08)',
+              border: '1px solid rgba(245, 192, 74, 0.35)',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '0.8em',
-              color: COLORS.textMute,
-              letterSpacing: 0.8,
-              flexWrap: 'wrap',
-              gap: 8,
+              alignItems: 'flex-start',
+              gap: 10,
+              fontSize: '0.82em',
+              color: COLORS.textDim,
+              lineHeight: 1.55,
             }}
           >
-            <div>{t('footnote')}</div>
-            <div className="font-mono">{t('buildId')}</div>
-          </footer>
+            <span style={{ fontSize: '1.1em', flexShrink: 0 }}>⚠</span>
+            <span>
+              <strong style={{ color: COLORS.text }}>Disclaimer:</strong> All data, names, figures, and scenarios shown
+              in this demo are entirely fictional and for demonstration purposes only. They do not represent real
+              individuals, organisations, or financial information.
+            </span>
+          </div>
+
         </div>
+
+        <footer
+          style={{
+            marginTop: 36,
+            paddingTop: 18,
+            borderTop: `1px solid ${COLORS.border}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.8em',
+            color: COLORS.textMute,
+            letterSpacing: 0.8,
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
+          <div>{t('footnote')}</div>
+          <div className="font-mono">{t('buildId')}</div>
+        </footer>
 
         {presenterOpen && (
           <div
@@ -1417,6 +1444,8 @@ function AgentPanel({
   onMemoApprove,
   scenario,
   isComplete,
+  stepMode,
+  onNextStep,
   t,
 }) {
   const [openSource, setOpenSource] = useState(null);
@@ -1494,6 +1523,36 @@ function AgentPanel({
               openSource={openSource}
               setOpenSource={setOpenSource}
             />
+            {stepMode && !isComplete && (
+              <button
+                onClick={onNextStep}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  alignSelf: 'flex-start',
+                  padding: '11px 18px',
+                  background: COLORS.mint,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: '0.88em',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  letterSpacing: 0.3,
+                  boxShadow: '0 2px 8px rgba(22,148,84,0.25)',
+                  transition: 'background 0.15s, transform 0.1s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = COLORS.mintDim}
+                onMouseLeave={e => e.currentTarget.style.background = COLORS.mint}
+                onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <ChevronRight size={16} />
+                {t('nextStep')}
+              </button>
+            )}
           </div>
         </div>
 
