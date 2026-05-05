@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import PKSFAgentDemo from './pksf_agent_demo.jsx';
+import DemoLoginGate from './pksf_demo_login_gate.jsx';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -30,7 +30,7 @@ class ErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <PKSFAgentDemo />
+      <DemoLoginGate />
     </ErrorBoundary>
   </React.StrictMode>,
 );

@@ -18,7 +18,6 @@ import {
   Network,
   Lock,
   FileCheck,
-  Workflow,
   Loader2,
   SkipForward,
   Languages,
@@ -511,20 +510,22 @@ export default function PKSFAgentDemo() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div
+              <img
+                src="/braindot-ai-logo.png"
+                alt="Braindot AI"
+                width={46}
+                height={46}
+                decoding="async"
                 style={{
                   width: 46,
                   height: 46,
                   borderRadius: 10,
-                  background: `linear-gradient(135deg, ${COLORS.mint}, ${COLORS.teal})`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  objectFit: 'contain',
+                  display: 'block',
+                  flexShrink: 0,
                   boxShadow: '0 0 24px rgba(22, 148, 84, 0.25)',
                 }}
-              >
-                <Workflow size={24} color={COLORS.onAccent} strokeWidth={2.4} />
-              </div>
+              />
               <div>
                 <div className="font-display" style={{ fontSize: '1.55em', fontWeight: 700, lineHeight: 1.15 }}>
                   {t('headerTitle')} <span style={{ color: COLORS.mint }}>·</span> {t('headerBadge')}
