@@ -286,7 +286,7 @@ Compose board briefing: executive summary, findings, root causes (environmental 
           to: 'PKSF Board of Directors',
           from: 'AI-Assisted Programme Intelligence Unit',
           date: '2 April 2026',
-          ref: 'PKSF/PI/KHL/Q1-2026/BM-007',
+          docRef: 'PKSF/PI/KHL/Q1-2026/BM-007',
           subject: 'Khulna Region Q1 2026 — Partner Organisation Performance Review & Recommendations',
           classification: 'INTERNAL — BOARD USE ONLY',
           sections: [
@@ -551,7 +551,7 @@ Compile confidential RJH-Q1 compliance bulletin with ledger row IDs + rule citat
           to: 'PKSF Risk Committee',
           from: 'AI-Assisted Compliance Sentinel Unit',
           date: '2 April 2026',
-          ref: 'PKSF/COMP/RJH/Q1-2026/CB-003',
+          docRef: 'PKSF/COMP/RJH/Q1-2026/CB-003',
           subject: 'Rajshahi Cluster Q1 2026 — Disbursement Compliance Bulletin',
           classification: '🔒 RESTRICTED — RISK COMMITTEE ONLY',
           sections: [

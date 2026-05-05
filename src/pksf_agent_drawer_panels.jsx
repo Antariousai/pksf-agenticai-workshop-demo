@@ -221,13 +221,15 @@ const SUGGESTIONS = [
   'Regional Director — Khulna', 'Programme Manager', 'Finance Director',
 ];
 
-export function SendPanel({ reportTitle, agentName }) {
+export function SendPanel({ reportTitle, agentName, sendButtonLabel, successTitle }) {
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState(`[PKSF Report] ${reportTitle ?? agentName + ' Output'}`);
   const [body, setBody] = useState(
     `Dear Sir/Madam,\n\nPlease find attached the AI-generated report from the ${agentName ?? 'specialist'} as part of the PKSF Programme Intelligence workflow.\n\nThis report was produced during the Q1 2026 Khulna regional review. All findings are sourced from the MIS data lake and field documentation systems.\n\nKindly review and revert with any observations.\n\nWarm regards,\nAgnetic AI · PKSF Edition`
   );
   const [status, setStatus] = useState('idle'); // idle | sending | sent
+  const sendLabel = sendButtonLabel ?? 'Send Report';
+  const sentTitle = successTitle ?? 'Report sent successfully';
 
   const handleSend = () => {
     if (!to.trim()) return;
@@ -241,7 +243,7 @@ export function SendPanel({ reportTitle, agentName }) {
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#ECFDF5', border: `2px solid ${COLORS.mint}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <CheckCircle2 size={28} color={COLORS.mint} />
         </div>
-        <div style={{ fontSize: '1.1em', fontWeight: 700, color: COLORS.text }}>Report sent successfully</div>
+        <div style={{ fontSize: '1.1em', fontWeight: 700, color: COLORS.text }}>{sentTitle}</div>
         <div style={{ fontSize: '0.9em', color: COLORS.textDim }}>Delivered to <strong>{to}</strong></div>
         <div style={{ fontSize: '0.82em', color: COLORS.textMute, marginTop: 4 }}>Subject: {subject}</div>
       </div>
@@ -309,7 +311,101 @@ export function SendPanel({ reportTitle, agentName }) {
         }}
       >
         {status === 'sending' ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-        {status === 'sending' ? 'Sending…' : 'Send Report'}
+        {status === 'sending' ? 'Sending…' : sendLabel}
+      </button>
+    </div>
+  );
+}
+
+/* ─── MIS publish simulation (final output drawer) ───── */
+const MIS_MODULE_BY_VARIANT = {
+  khulna: 'PKSF MIS Core — Programme Module',
+  compliance: 'PKSF MIS Core — Finance & Audit Module',
+  me_dhaka: 'PKSF MIS Core — M&E Module',
+  field_sylhet: 'Field Reporting System (FRS) → MIS Core',
+};
+
+const MIS_DOCTYPE_BY_VARIANT = {
+  khulna: 'Board briefing memo · Board circulation class',
+  compliance: 'Internal compliance bulletin · Risk committee',
+  me_dhaka: 'Donor M&E snapshot · External-release class',
+  field_sylhet: 'Field programme note · Operations coordination',
+};
+
+export function MisUploadPanel({
+  reportTitle,
+  variant,
+  publishLabel = 'Publish to MIS (simulation)',
+  publishingLabel = 'Publishing to MIS…',
+  doneTitle = 'Registered in MIS (simulation)',
+  doneSub = 'This document would appear in the controlled MIS register. No live system was updated.',
+  destinationLabel = 'Destination',
+  moduleLabel = 'Target module',
+  docTypeLabel = 'Document classification',
+  checksumLabel = 'Integrity check',
+  disclaimer = 'Simulation only. This mimics registering the final report in the MIS controlled document store. No data leaves this demo.',
+}) {
+  const [status, setStatus] = useState('idle'); // idle | publishing | done
+
+  const destination = 'PKSF MIS Core — Controlled Document Register';
+  const targetModule = MIS_MODULE_BY_VARIANT[variant] ?? MIS_MODULE_BY_VARIANT.khulna;
+  const docType = MIS_DOCTYPE_BY_VARIANT[variant] ?? MIS_DOCTYPE_BY_VARIANT.khulna;
+  const checksum = `SHA-256 · sim · ${String(reportTitle ?? 'report').slice(0, 24).replace(/\s/g, '-').toLowerCase()}…`;
+
+  const handlePublish = () => {
+    setStatus('publishing');
+    setTimeout(() => setStatus('done'), 2100);
+  };
+
+  if (status === 'done') {
+    return (
+      <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: COLORS.blueWash, border: `2px solid ${COLORS.mint}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Database size={26} color={COLORS.mint} />
+        </div>
+        <div style={{ fontSize: '1.05em', fontWeight: 700, color: COLORS.text }}>{doneTitle}</div>
+        <div style={{ fontSize: '0.88em', color: COLORS.textDim, lineHeight: 1.55, maxWidth: 420 }}>{doneSub}</div>
+        <div style={{ fontSize: '0.78em', color: COLORS.textMute, fontFamily: 'inherit', marginTop: 4 }}>
+          MIS ref · <span style={{ fontWeight: 600, color: COLORS.textDim }}>SIM-MIS-{String(variant).toUpperCase().slice(0, 3)}-{Date.now().toString().slice(-6)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: '0.82em', color: COLORS.textDim, lineHeight: 1.5, padding: '10px 12px', background: COLORS.blueWash, border: `1px solid ${COLORS.bluePale}`, borderRadius: 8, borderLeft: `4px solid ${COLORS.blue}` }}>
+        {disclaimer}
+      </div>
+
+      {[
+        [destinationLabel, destination],
+        [moduleLabel, targetModule],
+        [docTypeLabel, docType],
+        [checksumLabel, checksum],
+        ['Attachment', reportTitle ?? 'PKSF_Final_Report.pdf'],
+      ].map(([label, value]) => (
+        <div key={label}>
+          <div style={{ fontSize: '0.78em', color: COLORS.textMute, fontWeight: 700, marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.06 }}>{label}</div>
+          <div style={{ fontSize: '0.92em', color: COLORS.text, padding: '9px 12px', borderRadius: 7, border: `1.5px solid ${COLORS.border}`, background: COLORS.surfaceHi, lineHeight: 1.45 }}>{value}</div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={handlePublish}
+        disabled={status === 'publishing'}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          marginTop: 4,
+          padding: '11px 20px', borderRadius: 8,
+          background: status === 'publishing' ? COLORS.border : COLORS.navy,
+          color: '#fff', border: 'none', fontSize: '0.95em', fontWeight: 700,
+          cursor: status === 'publishing' ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {status === 'publishing' ? <Loader2 size={16} className="spin" /> : <Database size={16} />}
+        {status === 'publishing' ? publishingLabel : publishLabel}
       </button>
     </div>
   );
@@ -547,7 +643,7 @@ function DocChecklist({ title, items }) {
   );
 }
 
-function DocMemo({ to, from, date, ref: refId, subject, classification, sections }) {
+function DocMemo({ to, from, date, docRef, subject, classification, sections }) {
   return (
     <div style={{ margin: '14px 0', border: '1.5px solid #C8D8CF', borderRadius: 4, overflow: 'hidden' }}>
       <div style={{ background: COLORS.amber, padding: '4px 14px', fontSize: '0.72em', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.1, textAlign: 'center' }}>
@@ -555,7 +651,7 @@ function DocMemo({ to, from, date, ref: refId, subject, classification, sections
       </div>
       <div style={{ padding: '14px 18px', background: '#F7FCF9', borderBottom: '1px solid #E0E8E4' }}>
         <div style={{ fontWeight: 700, fontSize: '0.95em', color: '#111', marginBottom: 10, fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif", textTransform: 'uppercase', letterSpacing: 0.06 }}>Internal Memorandum</div>
-        {[['To', to], ['From', from], ['Date', date], ['Ref', refId]].map(([k, v]) => (
+        {[['To', to], ['From', from], ['Date', date], ['Ref', docRef]].map(([k, v]) => (
           <div key={k} style={{ display: 'flex', gap: 8, fontSize: '0.83em', marginBottom: 3 }}>
             <span style={{ color: '#666', fontWeight: 700, width: 36 }}>{k}:</span>
             <span style={{ color: '#222' }}>{v}</span>
